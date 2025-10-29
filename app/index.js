@@ -210,11 +210,12 @@ export default function Index() {
             marginTop: 8,
           })}
         >
+          
           <Text style={{ color: "white", fontWeight: "700" }}>
             {isSignup ? "Create account" : "Log in"}
           </Text>
         </Pressable>
-        
+
 
         {/* Switch helper */}
         <Pressable
