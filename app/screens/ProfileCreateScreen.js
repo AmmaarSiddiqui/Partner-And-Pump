@@ -1,14 +1,24 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  StyleSheet,
+  Alert,
+} from "react-native";
 import { useAuth } from "../state/useAuthContext";
+import { useTheme } from "@react-navigation/native";
 
 export default function ProfileCreateScreen() {
   const { setProfile } = useAuth();
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("strength"); // strength | endurance | aesthetics
   const [gym, setGym] = useState("");
+  const { colors } = useTheme(); 
 
   const onSave = () => {
+    // ... (your save logic is fine)
     if (!name.trim() || !gym.trim()) {
       Alert.alert("Missing info", "Please fill out your name and gym.");
       return;
@@ -17,33 +27,58 @@ export default function ProfileCreateScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.h1}>Create your profile</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.h1, { color: colors.text }]}>
+        Create your profile
+      </Text>
 
-      <Text style={styles.label}>Name</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Name</Text>
       <TextInput
         value={name}
         onChangeText={setName}
         placeholder="e.g., Yasir"
-        style={styles.input}
+        placeholderTextColor="gray" 
+        style={[
+          styles.input,
+          {
+            color: colors.text,
+            backgroundColor: colors.card, 
+            borderColor: colors.border,   
+          },
+        ]}
       />
 
-      <Text style={styles.label}>Primary Goal</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Primary Goal</Text>
       <TextInput
         value={goal}
         onChangeText={setGoal}
         placeholder="strength | endurance | aesthetics"
-        style={styles.input}
+        placeholderTextColor="gray"
+        style={[
+          styles.input,
+          {
+            color: colors.text,
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
+        ]}
       />
 
-      <Text style={styles.label}>Primary Gym</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Primary Gym</Text>
       <TextInput
         value={gym}
         onChangeText={setGym}
         placeholder="e.g., LA Fitness - Downtown"
-        style={styles.input}
+        placeholderTextColor="gray"
+        style={[
+          styles.input,
+          {
+            color: colors.text,
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
+        ]}
       />
-
       <Button title="Save & Continue" onPress={onSave} />
     </View>
   );

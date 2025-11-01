@@ -5,10 +5,13 @@
 
 import React, { useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { useTheme, useNavigation } from "@react-navigation/native";
 
 export default function MatchScreen() {
   // keep track of which mode we're on like "pumpNow" or "longTerm"
   const [mode, setMode] = useState("pumpNow");
+  const { colors } = useTheme();
+  const navigation = useNavigation();
 
   // mock categories for display only
   const categories = [
@@ -24,18 +27,22 @@ export default function MatchScreen() {
   const titleText = mode === "pumpNow" ? "Pump Now" : "Long-Term";
 
   return (
-    <View style={styles.container}>
-      {/* main header */}
-      <Text style={styles.title}>MATCH</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.text }]}>MATCH</Text>
 
-      {/* toggle between Pump Now and Long-Term */}
-      <View style={styles.toggleRow}>
+      <View style={[styles.toggleRow, { backgroundColor: colors.card }]}>
         <Pressable
           onPress={() => setMode("pumpNow")}
-          style={[styles.toggleBtn, mode === "pumpNow" && styles.activeToggle]}
+          style={[
+            styles.toggleBtn,
+            mode === "pumpNow" && { backgroundColor: colors.primary },
+          ]}
         >
           <Text
-            style={[styles.toggleText, mode === "pumpNow" && styles.activeText]}
+            style={[
+              styles.toggleText,
+              { color: mode === "pumpNow" ? "white" : "gray" },
+            ]}
           >
             Pump Now
           </Text>
@@ -43,37 +50,50 @@ export default function MatchScreen() {
 
         <Pressable
           onPress={() => setMode("longTerm")}
-          style={[styles.toggleBtn, mode === "longTerm" && styles.activeToggle]}
+          style={[
+            styles.toggleBtn,
+            mode === "longTerm" && { backgroundColor: colors.primary },
+          ]}
         >
           <Text
-            style={[styles.toggleText, mode === "longTerm" && styles.activeText]}
+            style={[
+              styles.toggleText,
+              { color: mode === "longTerm" ? "white" : "gray" },
+            ]}
           >
             Long-Term
           </Text>
         </Pressable>
       </View>
 
-      {/* section label (changes with toggle) */}
-      <Text style={styles.sectionTitle}>
+      <Text style={[styles.sectionTitle, { color: "gray" }]}>
         {titleText === "Pump Now" ? "Same-Day Sessions" : "Ongoing Partnerships"}
       </Text>
 
-      {/* categories grid */}
       <ScrollView
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
         {categories.map((cat) => (
-          <Pressable key={cat.label} style={styles.box}>
+          <Pressable
+            key={cat.label}
+            style={[styles.box, { 
+              backgroundColor: colors.card, 
+              borderColor: colors.border 
+            }]}
+            onPress={() =>
+              navigation.navigate("MatchList", {
+                category: cat.label,
+                mode: mode,
+              })
+            }
+          >
             <Text style={styles.icon}>{cat.icon}</Text>
-            <Text style={styles.boxText}>{cat.label}</Text>
+            <Text style={[styles.boxText, { color: colors.text }]}>
+              {cat.label}
+            </Text>
           </Pressable>
         ))}
-
-        {/* back button placeholder */}
-        <Pressable style={[styles.box, styles.backBox]}>
-          <Text style={styles.boxText}>Back</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );
@@ -83,12 +103,10 @@ export default function MatchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f0f10",
     paddingHorizontal: 20,
-    paddingTop: 70,
+    paddingTop: 70, // This might be too large, adjust as needed
   },
   title: {
-    color: "white",
     fontSize: 28,
     fontWeight: "800",
     textAlign: "center",
@@ -97,7 +115,6 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     flexDirection: "row",
-    backgroundColor: "#1a1b1e",
     borderRadius: 12,
     marginBottom: 12,
     overflow: "hidden",
@@ -107,19 +124,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
   },
-  activeToggle: {
-    backgroundColor: "#3b6cff",
-  },
+  // 'activeToggle' removed, backgroundColor applied inline
   toggleText: {
-    color: "#9aa0a6",
     fontWeight: "600",
     fontSize: 14,
   },
-  activeText: {
-    color: "#fff",
-  },
+  // 'activeText' removed, color applied inline
   sectionTitle: {
-    color: "#9aa0a6",
     fontSize: 14,
     textAlign: "center",
     marginBottom: 18,
@@ -132,26 +143,20 @@ const styles = StyleSheet.create({
   },
   box: {
     width: "47%",
-    backgroundColor: "#1a1b1e",
     borderRadius: 16,
     paddingVertical: 28,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#2b2f36",
   },
-  backBox: {
-    backgroundColor: "#2b2f36",
-  },
+  // 'backBox' removed, styles applied inline
   icon: {
     fontSize: 28,
     marginBottom: 10,
   },
   boxText: {
-    color: "white",
     fontSize: 16,
     fontWeight: "600",
   },
 });
-

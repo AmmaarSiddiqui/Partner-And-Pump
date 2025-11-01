@@ -1,8 +1,11 @@
 import React, { useMemo } from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
+import { useTheme } from "@react-navigation/native";
 import { useAuth } from "../state/useAuthContext";
 import MatchCard from "../components/MatchCard";
 // If your service exists, import it; else use a tiny fallback:
+
+// TODO: implement a proper compatibility scoring algorithm
 let compatibilityScore;
 try {
   compatibilityScore = require("../services/matching/compatibilityScore").default;
@@ -26,6 +29,7 @@ const CANDIDATES = [
 
 export default function PumpNowScreen() {
   const { profile } = useAuth();
+  const { colors } = useTheme();
 
   const ranked = useMemo(() => {
     if (!profile) return [];
@@ -38,8 +42,10 @@ export default function PumpNowScreen() {
   }, [profile]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.h1}>Matches near {profile?.gym}</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.h1, { color: colors.text }]}>
+        Matches near {profile?.gym}
+      </Text>
       <FlatList
         data={ranked}
         keyExtractor={(item) => item.id}
