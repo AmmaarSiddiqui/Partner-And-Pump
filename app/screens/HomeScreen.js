@@ -30,7 +30,7 @@ export default function HomeScreen({ navigation }) {
         style={[styles.button, { backgroundColor: colors.primary }]} 
         onPress={() => navigation.navigate("Match")}
       >
-        <Text style={styles.buttonText}>Find a partner (Pump Now)</Text>
+        <Text style={styles.buttonText}>Find a partner (Match)</Text>
       </TouchableOpacity>
     </View>
   );

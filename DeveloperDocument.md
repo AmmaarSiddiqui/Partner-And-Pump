@@ -15,10 +15,10 @@
   1. Clone the repository
       Anyone can access the source code by cloning this public GitHub repository:
 ```
-git clone https://github.com/PartnerAndPump/partner-and-pump.git
+git clone https://github.com/AmmaarSiddiqui/Partner-And-Pump
 ```
   3. Navigate into the project directory
-      cd partner-and-pump
+      cd Partner-And-Pump
 
 # Directory Structure
  ```
@@ -89,16 +89,18 @@ cd functions
 npm ci
 cd ..
 ```
+#### Environment Variables
+Make sure to email mas954@uw.edu for environment variables (Currently should not be needed)
 
 2) Build & run the mobile client (Expo)
 #### From repo root
 #### Clear cache on first run while we’re evolving dependencies
 ```
-cd ~
+cd Partner-And-Pump
 npx expo start -c
 ```
 Download the Expo Go App. 
-Scan the QR with Expo Go (iOS/Android) to launch the app.
+Scan the QR code with Expo Go (iOS/Android) to open Partner And Pump on your device.
 
 Make sure your phone and computer are on the same network.
 

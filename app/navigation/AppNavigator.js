@@ -19,6 +19,8 @@ import PumpNowScreen from "../screens/PumpNowScreen";
 import MatchListScreen from "../screens/MatchListScreen";
 import DiscoverScreen from "../screens/DiscoverScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import MessagesScreen from "../screens/MessagesScreen";
+import ChatScreen from "../screens/ChatScreen";
 import ProfileStack from "./ProfileStack";
 
 
@@ -53,7 +55,9 @@ function MainAppTabs() {
             iconName = focused ? "person" : "person-outline";
           } else if (route.name === "Discover") {
             iconName = focused ? "compass" : "compass-outline";
-          } 
+          } else if (route.name === "Messages") {
+            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
+          }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
 
@@ -77,6 +81,7 @@ function MainAppTabs() {
         component={MatchScreen}
         options={{ title: "Match" }}
       />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
@@ -151,6 +156,10 @@ export default function AppNavigator() {
               name="MatchList"
               component={MatchListScreen}
               // The title will be set dynamically by the screen itself
+            />
+            <Stack.Screen
+              name="Chat"
+              component={ChatScreen}
             />
           </Stack.Group>)
         )}

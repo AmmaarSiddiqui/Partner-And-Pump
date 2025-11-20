@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-nati
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../state/useAuthContext";
 import { ActivityIndicator } from "react-native";
+import { useMatches } from "../state/useMatchesContext";
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
-  const { user, profile } = useAuth(); // <-- trust the provider
+  const { user, profile } = useAuth(); // trust the provider
+  const { matches, cancelMatch } = useMatches();
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -23,7 +25,7 @@ export default function ProfileScreen() {
     });
   }, [navigation]);
 
-  // 1) loading: provider hasn't delivered a snapshot yet
+  // 1) loading
   if (profile === undefined) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" }}>
@@ -43,7 +45,7 @@ export default function ProfileScreen() {
     );
   }
 
-  // 3) ready: render mapped profile
+  // 3) ready
   const DAYS_ORDER = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const mapped = {
     initials: profile.name ? profile.name[0].toUpperCase() : "?",
@@ -56,12 +58,14 @@ export default function ProfileScreen() {
     gymAddr: profile.gym?.address || "",
     time: profile.time || "",
     days: Array.isArray(profile.days) ? profile.days : [],
-    availability: Array.isArray(profile.availability) && profile.availability.length > 0
-      ? profile.availability
-      : (Array.isArray(profile.days) ? [...profile.days]
-          .sort((a,b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b))
-          .map(d => ({ day: d, time: profile.time || "Anytime", tag: "preferred" }))
-        : []),
+    availability:
+      Array.isArray(profile.availability) && profile.availability.length > 0
+        ? profile.availability
+        : Array.isArray(profile.days)
+        ? [...profile.days]
+            .sort((a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b))
+            .map((d) => ({ day: d, time: profile.time || "Anytime", tag: "preferred" }))
+        : [],
   };
 
   return (
@@ -102,12 +106,43 @@ export default function ProfileScreen() {
         <Card title="About Me">
           <Text style={styles.aboutText}>{mapped.about || "—"}</Text>
         </Card>
+
+        {/* NEW: Schedule */}
+        <Card title="Schedule">
+          {matches.length === 0 ? (
+            <Text style={{ color: "#9ca3af" }}>No scheduled partners yet.</Text>
+          ) : (
+            matches.map((m) => (
+              <View key={`${m.id}-${m.mode}-${m.category}`} style={styles.scheduleRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.scheduleName}>{m.name}</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
+                    {m.days.length === 0 ? (
+                      <Text style={{ color: "#9ca3af" }}>Days TBD</Text>
+                    ) : (
+                      m.days.map((d) => (
+                        <View key={d} style={styles.dayChip}>
+                          <Text style={styles.dayChipText}>{d}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => cancelMatch(m.id, m.mode, m.category)}
+                  style={styles.cancelBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </Card>
       </ScrollView>
     </View>
   );
 }
-
-
 
 /* ---------- tiny building blocks ---------- */
 
@@ -216,4 +251,39 @@ const styles = StyleSheet.create({
   avTagText: { color: "#22c55e", fontWeight: "700" },
 
   aboutText: { color: "#e5e7eb", lineHeight: 20 },
+
+  /* schedule styles */
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1b1b1b",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#222",
+  },
+  scheduleName: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  dayChip: {
+    backgroundColor: "#1f1f1f",
+    borderRadius: 9999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+  },
+  dayChipText: { color: "#fff", fontWeight: "700" },
+  cancelBtn: {
+    backgroundColor: "rgba(239,68,68,0.12)",
+    borderColor: "#ef4444",
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 9999,
+    marginLeft: 12,
+  },
+  cancelBtnText: { color: "#ef4444", fontWeight: "800" },
 });
