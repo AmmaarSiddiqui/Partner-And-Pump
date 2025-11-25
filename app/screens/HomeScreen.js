@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -28,12 +28,23 @@ export default function HomeScreen({ navigation }) {
   const { profile } = useAuth();
   const { colors } = useTheme();
 
+  // 1. Use state for notifications so we can modify the list
+  const [notifications, setNotifications] = useState(MOCK_MATCH_NOTIFICATIONS);
+
   // Get current date formatted nicely (e.g., "Monday, Nov 25")
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
     day: "numeric",
   });
+
+  // 2. Handle the match action
+  const handleMatch = (item) => {
+    // Remove the item from the list
+    setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+    // Navigate to chat
+    navigation.navigate("Chat", { recipientName: item.name });
+  };
 
   const renderMatchNotification = ({ item }) => (
     <View style={[styles.notificationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -48,7 +59,8 @@ export default function HomeScreen({ navigation }) {
       </View>
       <TouchableOpacity
         style={[styles.matchButton, { backgroundColor: colors.primary }]}
-        onPress={() => navigation.navigate("Chat", { recipientName: item.name })}
+        // 3. Call the handler instead of direct navigation
+        onPress={() => handleMatch(item)}
       >
         <Text style={styles.matchButtonText}>Match</Text>
       </TouchableOpacity>
@@ -92,22 +104,24 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* 2. New Matches Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>New Matches</Text>
-          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-            <Text style={styles.badgeText}>{MOCK_MATCH_NOTIFICATIONS.length}</Text>
+      {/* 2. New Matches Section - Only show if there are notifications */}
+      {notifications.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>New Matches</Text>
+            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.badgeText}>{notifications.length}</Text>
+            </View>
           </View>
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMatchNotification}
+            scrollEnabled={false} // Let the parent ScrollView handle scrolling
+            contentContainerStyle={styles.listContent}
+          />
         </View>
-        <FlatList
-          data={MOCK_MATCH_NOTIFICATIONS}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMatchNotification}
-          scrollEnabled={false} // Let the parent ScrollView handle scrolling
-          contentContainerStyle={styles.listContent}
-        />
-      </View>
+      )}
 
       {/* 3. Calendar / Schedule Section */}
       <View style={styles.section}>
