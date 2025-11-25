@@ -91,7 +91,7 @@ export default function HomeScreen({ navigation }) {
       {/* 1. Header & Greeting */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.greeting, { color: "gray" }]}>Good Morning,</Text>
+          <Text style={[styles.greeting, { color: "gray" }]}>Hello,</Text>
           <Text style={[styles.username, { color: colors.text }]}>
             {profile?.name || "Lifter"} 👋
           </Text>

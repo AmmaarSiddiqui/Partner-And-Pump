@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert, // 1. Import Alert
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -25,9 +26,37 @@ export default function ChatScreen({ route, navigation }) {
   const { colors } = useTheme();
   const { recipientName } = route.params;
 
+  // 2. Create the unmatch handler
+  const handleUnmatch = () => {
+    Alert.alert(
+      "Unmatch",
+      `Are you sure you want to unmatch with ${recipientName}?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Unmatch",
+          style: "destructive", // Shows red on iOS
+          onPress: () => {
+            // In a real app, you would make an API call here
+            navigation.goBack();
+          },
+        },
+      ]
+    );
+  };
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title: recipientName,
+      // 3. Add the button to the header
+      headerRight: () => (
+        <TouchableOpacity onPress={handleUnmatch}>
+          <Text style={styles.unmatchText}>Unmatch</Text>
+        </TouchableOpacity>
+      ),
     });
   }, [navigation, recipientName]);
 
@@ -84,6 +113,12 @@ export default function ChatScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  // 4. Style for the unmatch button text
+  unmatchText: {
+    color: "#FF3B30", // Standard iOS destructive red
+    fontWeight: "600",
+    fontSize: 16,
+  },
   chatList: {
     flex: 1,
     paddingHorizontal: 10,
