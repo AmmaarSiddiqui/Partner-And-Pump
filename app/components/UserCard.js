@@ -14,10 +14,18 @@ export default function UserCard({
   age,
   bio,
   tags = [],
+  score,
   isMatched = false,
   onMatch,
 }) {
   const { colors } = useTheme();
+
+  let scoreColor = "gray"; // fallback
+  if (typeof score === "number") {
+    if (score >= 80) scoreColor = "#4CAF50";      // green
+    else if (score >= 50) scoreColor = "#FFC107"; // yellow
+    else scoreColor = "#F44336";                 // red
+  }
 
   return (
     <View
@@ -38,6 +46,12 @@ export default function UserCard({
           {name}, {age}
         </Text>
         <Text style={[styles.bio, { color: "gray" }]}>{bio}</Text>
+
+         {typeof score === "number" && (
+      <Text style={[styles.scoreText, { color: scoreColor }]}>
+        Match: {score}%
+      </Text>
+    )}
 
         <View style={styles.tagRow}>
           {tags.map((tag) => (
@@ -87,6 +101,7 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   name: { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
   bio: { fontSize: 14, marginBottom: 8 },
+  
   tagRow: { flexDirection: "row", flexWrap: "wrap" },
   tag: {
     borderRadius: 6,
