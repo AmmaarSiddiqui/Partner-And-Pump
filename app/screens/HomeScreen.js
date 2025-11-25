@@ -11,13 +11,15 @@ import { useAuth } from "../state/useAuthContext";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
-// Mock Data for "Who Matched You"
+// TODO: BACKEND - Fetch "New Matches" notifications from the database (e.g., /api/notifications/matches).
+// This should return a list of users who have matched with the current user but haven't been chatted with yet.
 const MOCK_MATCH_NOTIFICATIONS = [
   { id: "1", name: "Jessica Wu", goal: "Hypertrophy", time: "20m ago" },
   { id: "2", name: "David Chen", goal: "Strength", time: "2h ago" },
 ];
 
-// Mock Data for Today's Schedule
+// TODO: BACKEND - Fetch the user's schedule for the current day from the database (e.g., /api/schedule/today).
+// This might include planned workouts, meal times, or sessions scheduled via the ChatScreen.
 const MOCK_SCHEDULE = [
   { id: "1", time: "07:00 AM", activity: "Morning Cardio", status: "completed" },
   { id: "2", time: "05:30 PM", activity: "Push Day (Chest & Tris)", status: "upcoming" },
@@ -28,7 +30,8 @@ export default function HomeScreen({ navigation }) {
   const { profile } = useAuth();
   const { colors } = useTheme();
 
-  // 1. Use state for notifications so we can modify the list
+  // TODO: BACKEND - Initialize this state with data fetched from the API.
+  // Consider using a real-time listener if notifications should appear instantly.
   const [notifications, setNotifications] = useState(MOCK_MATCH_NOTIFICATIONS);
 
   // Get current date formatted nicely (e.g., "Monday, Nov 25")
@@ -38,9 +41,12 @@ export default function HomeScreen({ navigation }) {
     day: "numeric",
   });
 
-  // 2. Handle the match action
+  // Handle the match action
   const handleMatch = (item) => {
-    // Remove the item from the list
+    // TODO: BACKEND - Send a request to mark this notification as 'read' or 'acted upon' in the database.
+    // Example: POST /api/notifications/{id}/ack
+    
+    // Remove the item from the list (Optimistic UI update)
     setNotifications((prev) => prev.filter((n) => n.id !== item.id));
     // Navigate to chat
     navigation.navigate("Chat", { recipientName: item.name });
@@ -59,7 +65,6 @@ export default function HomeScreen({ navigation }) {
       </View>
       <TouchableOpacity
         style={[styles.matchButton, { backgroundColor: colors.primary }]}
-        // 3. Call the handler instead of direct navigation
         onPress={() => handleMatch(item)}
       >
         <Text style={styles.matchButtonText}>Match</Text>
