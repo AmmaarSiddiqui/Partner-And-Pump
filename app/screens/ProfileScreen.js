@@ -1,18 +1,36 @@
-import React, { useLayoutEffect } from "react";
+import React, { useLayoutEffect, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../state/useAuthContext";
 import { signOut } from "firebase/auth";
 import { ActivityIndicator } from "react-native";
-import { useMatches } from "../state/useMatchesContext";
-import { auth } from "../services/firebase"; 
+import { auth, db } from "../services/firebase"; 
 import AsyncStorage from "@react-native-async-storage/async-storage"; 
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  getDoc,
+  doc,
+  deleteDoc,
+} from "firebase/firestore";
+
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { user, profile } = useAuth(); // trust the provider
-  const { matches, cancelMatch } = useMatches();
+  const [matches, setMatches] = useState([]);
   // inside ProfileScreen:
+
+  const cancelConfirmedMatch = async (matchId) => {
+  try {
+    await deleteDoc(doc(db, "matches", matchId));
+    console.log("[Profile] Match canceled:", matchId);
+  } catch (e) {
+    console.warn("[Profile] cancel match error:", e);
+  }
+    };
 const handleLogout = async () => {
   console.log("[Profile] logout pressed");
 
@@ -48,6 +66,62 @@ const handleLogout = async () => {
       ),
     });
   }, [navigation]);
+
+    useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    // listen to /matches where this user participates
+    const q = query(
+      collection(db, "matches"),
+      where("users", "array-contains", uid)
+    );
+
+    const unsub = onSnapshot(q, async (snap) => {
+      const rows = await Promise.all(
+  snap.docs.map(async (docSnap) => {
+    const data = docSnap.data();
+    const matchId = docSnap.id;
+
+    const users = Array.isArray(data.users) ? data.users : [];
+    const otherUserId = users.find((u) => u !== uid) || null;
+
+    let otherName = "Gym partner";
+    let otherPreferredTime = "";   // 👈 NEW
+
+    try {
+      if (otherUserId) {
+        const profSnap = await getDoc(doc(db, "profiles", otherUserId));
+        if (profSnap.exists()) {
+          const p = profSnap.data();
+          if (p.name) otherName = p.name;
+          if (p.time) otherPreferredTime = p.time;   // 👈 from their profile
+        }
+      }
+    } catch (e) {
+      console.warn("[Profile] failed to load match profile", otherUserId, e);
+    }
+
+    return {
+      id: matchId,
+      otherUserId,
+      name: otherName,
+      mode: data.mode || "",            
+      category: data.category || "",
+      days: Array.isArray(data.days) ? data.days : [],
+      preferredTime: otherPreferredTime, 
+    };
+  })
+);
+
+
+
+      setMatches(rows);
+    });
+
+    return () => unsub();
+  }, []);
+
 
   // 1) loading
   if (profile === undefined) {
@@ -131,37 +205,65 @@ const handleLogout = async () => {
           <Text style={styles.aboutText}>{mapped.about || "—"}</Text>
         </Card>
 
-        {/* NEW: Schedule */}
-        <Card title="Schedule">
+        {/* Matches list (actual confirmed matches) */}
+        <Card title="Matches">
           {matches.length === 0 ? (
-            <Text style={{ color: "#9ca3af" }}>No scheduled partners yet.</Text>
+            <Text style={{ color: "#9ca3af" }}>No matches yet.</Text>
           ) : (
-            matches.map((m) => (
-              <View key={`${m.id}-${m.mode}-${m.category}`} style={styles.scheduleRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.scheduleName}>{m.name}</Text>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
-                    {m.days.length === 0 ? (
-                      <Text style={{ color: "#9ca3af" }}>Days TBD</Text>
-                    ) : (
-                      m.days.map((d) => (
-                        <View key={d} style={styles.dayChip}>
-                          <Text style={styles.dayChipText}>{d}</Text>
-                        </View>
-                      ))
-                    )}
+            matches.map((m) => {
+              const modeLabel =
+                m.mode === "pumpNow"
+                  ? "Pump-now partner"
+                  : m.mode === "longTerm"
+                  ? "Long-term partner"
+                  : "Match";
+
+              return (
+                <View key={m.id} style={styles.scheduleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.scheduleName}>{m.name}</Text>
+
+                    {/* Match type */}
+                    <Text style={{ color: "#9ca3af", marginTop: 4 }}>
+                      {modeLabel}
+                      {m.category ? ` • ${m.category}` : ""}
+                    </Text>
+
+                    {/* Preferred time */}
+                    {m.preferredTime ? (
+                      <Text style={{ color: "#ccc", marginTop: 4, fontWeight: "600" }}>
+                        Pref time: {m.preferredTime}
+                      </Text>
+                    ) : null}
+
+                    {/* Days */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
+                      {m.days.length === 0 ? (
+                        <Text style={{ color: "#9ca3af" }}>Days: TBD</Text>
+                      ) : (
+                        m.days.map((d) => (
+                          <View key={d} style={styles.dayChip}>
+                            <Text style={styles.dayChipText}>{d}</Text>
+                          </View>
+                        ))
+                      )}
+                    </View>
                   </View>
+
+                  {/* CANCEL MATCH BUTTON */}
+                  <TouchableOpacity
+                    onPress={() => cancelConfirmedMatch(m.id)}
+                    style={styles.cancelBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => cancelMatch(m.id, m.mode, m.category)}
-                  style={styles.cancelBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            ))
+              );
+            })
           )}
+
+
         </Card>
 
                 {/* Logout button at bottom */}

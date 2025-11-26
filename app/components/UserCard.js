@@ -68,7 +68,9 @@ export default function UserCard({
       <TouchableOpacity
         style={[
           styles.matchButton,
-          { backgroundColor: isMatched ? "transparent" : colors.primary },
+          isMatched
+            ? { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border }
+            : { backgroundColor: colors.primary },
         ]}
         onPress={onMatch}
         disabled={isMatched}
@@ -82,9 +84,10 @@ export default function UserCard({
           numberOfLines={1}
           adjustsFontSizeToFit
         >
-          {isMatched ? "Matched" : "Match"}
+          {isMatched ? "Sent" : "Match"}
         </Text>
       </TouchableOpacity>
+
     </View>
   );
 }
