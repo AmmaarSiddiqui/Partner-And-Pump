@@ -15,7 +15,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyArWbYT4-bXV3nKv8-WCn9ZRSNgK788DCs",
   authDomain: "partnerandpump.firebaseapp.com",
   projectId: "partnerandpump",
-  storageBucket: "partnerandpump.appspot.com", // ✅ correct bucket ID
+  storageBucket: "partnerandpump.appspot.com", 
   messagingSenderId: "266137880793",
   appId: "1:266137880793:web:863a252a2118a38d1916c8",
   measurementId: "G-J87WQ6KB0G",

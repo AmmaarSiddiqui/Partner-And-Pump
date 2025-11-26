@@ -3,7 +3,8 @@
 import React, { useLayoutEffect, useEffect, useState } from "react";
 import { View, FlatList, StyleSheet, Text, ActivityIndicator } from "react-native";
 import { useTheme } from "@react-navigation/native";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
+
 
 import { auth, db } from "../services/firebase";
 import { useAuth } from "../state/useAuthContext";
@@ -19,7 +20,7 @@ export default function MatchListScreen({ route, navigation }) {
   const { profile } = useAuth();           // 👈 this is *me*
   const { addMatch } = useMatches();
 
-  const [matchedIds, setMatchedIds] = useState(new Set());
+  const [sentIds, setSentIds] = useState(new Set());
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,93 +30,147 @@ export default function MatchListScreen({ route, navigation }) {
   }, [navigation, category, mode]);
 
   useEffect(() => {
-    let isMounted = true;
+  let isMounted = true;
 
-    // still loading my own profile? don't try to match yet
-    if (profile === undefined) {
-      return;
-    }
+  // still loading my own profile? don't try to match yet
+  if (profile === undefined) {
+    return;
+  }
 
-    const loadMatches = async () => {
-      setLoading(true);
-      try {
-        // 1) get ALL profiles from Firestore
-        const snap = await getDocs(collection(db, "profiles"));
-        const allProfiles = [];
-        snap.forEach((docSnap) => {
-          allProfiles.push({ id: docSnap.id, ...docSnap.data() });
-        });
-
-        // 2) split: me vs others
-        const myUid = auth.currentUser?.uid || null;
-        const others = allProfiles.filter((p) => p.id !== myUid); // <- other people only
-
-        let result;
-
-        if (!profile) {
-          // logged in but no profile data yet: just show others, no score
-          result = others.map((p) => ({
-            id: p.id,
-            name: p.name || "Gym partner",
-            age: p.age || null,
-            bio: p.about || "",
-            tags: buildProfileTags(p, { mode }),
-            scheduleDays: Array.isArray(p.days) ? p.days : [],
-            score: 0,
-          }));
-        } else {
-          // we have *me* (my profile) → compare me vs each other
-          result = others
-            .map((p) => {
-              const rawScore = computeCompatibilityScore(profile, p, { mode, category });
-              const score = Math.round((rawScore / 10) * 100); 
-              return {
-                id: p.id,
-                name: p.name || "Gym partner",
-                age: p.age || null,
-                bio: p.about || "",
-                tags: buildProfileTags(p, { mode }),
-                scheduleDays: Array.isArray(p.days) ? p.days : [],
-                score,
-              };
-            })
-            // while debugging, you can comment this filter out to always see everyone:
-            .filter((m) => m.score > 0)
-            .sort((a, b) => b.score - a.score);
-        }
-
+  const loadMatches = async () => {
+    setLoading(true);
+    try {
+      const myUid = auth.currentUser?.uid || null;
+      if (!myUid) {
         if (isMounted) {
-          setData(result);
+          setData([]);
+          setSentIds(new Set());
         }
-      } catch (e) {
-        console.warn("[MatchList] load error:", e);
-        if (isMounted) setData([]);
-      } finally {
-        if (isMounted) setLoading(false);
+        return;
       }
-    };
 
-    loadMatches();
-    return () => {
-      isMounted = false;
-    };
-  }, [mode, category, profile]);
+      // 0) Find all confirmed matches for me -> exclude these people
+      const matchesSnap = await getDocs(
+        query(
+          collection(db, "matches"),
+          where("users", "array-contains", myUid)
+        )
+      );
+
+      const matchedPartnerIds = new Set();
+      matchesSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const users = Array.isArray(data.users) ? data.users : [];
+        users.forEach((u) => {
+          if (u !== myUid) {
+            matchedPartnerIds.add(u);
+          }
+        });
+      });
+
+      // 1) Find all sent match requests (outgoing) for this mode+category
+      const sentSnap = await getDocs(
+        query(
+          collection(db, "matchRequests"),
+          where("fromUserId", "==", myUid),
+          where("mode", "==", mode),
+          where("category", "==", category),
+          where("status", "==", "pending")
+        )
+      );
+
+      const newSentIds = new Set();
+      sentSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.toUserId) {
+          newSentIds.add(data.toUserId);
+        }
+      });
+
+      if (!isMounted) return;
+      setSentIds(newSentIds);
+
+      // 2) get ALL profiles from Firestore
+      const snap = await getDocs(collection(db, "profiles"));
+      const allProfiles = [];
+      snap.forEach((docSnap) => {
+        allProfiles.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      // 3) split: me vs others, and exclude people I'm already matched with
+      const others = allProfiles.filter(
+        (p) => p.id !== myUid && !matchedPartnerIds.has(p.id)
+      );
+
+      let result;
+
+      if (!profile) {
+        // logged in but no profile data yet: just show others, no score
+        result = others.map((p) => ({
+          id: p.id,
+          name: p.name || "Gym partner",
+          age: p.age || null,
+          bio: p.about || "",
+          tags: buildProfileTags(p, { mode }),
+          scheduleDays: Array.isArray(p.days) ? p.days : [],
+          score: 0,
+        }));
+      } else {
+        // we have *me* (my profile) → compare me vs each other
+        result = others
+          .map((p) => {
+            const rawScore = computeCompatibilityScore(profile, p, { mode, category });
+            const score = Math.round((rawScore / 10) * 100);
+            return {
+              id: p.id,
+              name: p.name || "Gym partner",
+              age: p.age || null,
+              bio: p.about || "",
+              tags: buildProfileTags(p, { mode }),
+              scheduleDays: Array.isArray(p.days) ? p.days : [],
+              score,
+            };
+          })
+          .filter((m) => m.score > 0)
+          .sort((a, b) => b.score - a.score);
+      }
+
+      if (isMounted) {
+        setData(result);
+      }
+    } catch (e) {
+      console.warn("[MatchList] load error:", e);
+      if (isMounted) setData([]);
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  loadMatches();
+  return () => {
+    isMounted = false;
+  };
+}, [mode, category, profile]);
+
 
   const handleMatch = (item) => {
-    setMatchedIds((prev) => {
-      const next = new Set(prev);
-      next.add(item.id);
-      return next;
-    });
+  // Optimistic UI: mark as "sent" immediately
+  setSentIds((prev) => {
+    const next = new Set(prev);
+    next.add(item.id);
+    return next;
+  });
 
-    addMatch({
-      id: item.id,
-      name: item.name,
-      category,
-      mode,
-      days: item.scheduleDays ?? [],
-    });
-  };
+  // Actually send match request
+  addMatch({
+    id: item.id,
+    name: item.name,
+    category,
+    mode,
+    days: item.scheduleDays ?? [],
+  });
+};
+
 
   if (loading) {
     return (
@@ -148,9 +203,10 @@ export default function MatchListScreen({ route, navigation }) {
               score={item.score}
               bio={item.bio}
               tags={item.tags}
-              isMatched={matchedIds.has(item.id)}
+              isMatched={sentIds.has(item.id)}    
               onMatch={() => handleMatch(item)}
             />
+
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}

@@ -7,9 +7,11 @@ import {
   ScrollView,
   FlatList,
 } from "react-native";
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../state/useAuthContext";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { useMatches } from "../state/useMatchesContext";
 
 // TODO: BACKEND - Fetch "New Matches" notifications from the database (e.g., /api/notifications/matches).
 // This should return a list of users who have matched with the current user but haven't been chatted with yet.
@@ -26,13 +28,16 @@ const MOCK_SCHEDULE = [
   { id: "3", time: "07:00 PM", activity: "Post-Workout Meal", status: "upcoming" },
 ];
 
+
 export default function HomeScreen({ navigation }) {
   const { profile } = useAuth();
   const { colors } = useTheme();
+const { matches, acceptMatch } = useMatches();
+  const notifications = matches;
+
 
   // TODO: BACKEND - Initialize this state with data fetched from the API.
   // Consider using a real-time listener if notifications should appear instantly.
-  const [notifications, setNotifications] = useState(MOCK_MATCH_NOTIFICATIONS);
 
   // Get current date formatted nicely (e.g., "Monday, Nov 25")
   const today = new Date().toLocaleDateString("en-US", {
@@ -41,17 +46,15 @@ export default function HomeScreen({ navigation }) {
     day: "numeric",
   });
 
-  // Handle the match action
-  const handleMatch = (item) => {
-    // TODO: BACKEND - Send a request to mark this notification as 'read' or 'acted upon' in the database.
-    // Example: POST /api/notifications/{id}/ack
-    
-    // Remove the item from the list (Optimistic UI update)
-    setNotifications((prev) => prev.filter((n) => n.id !== item.id));
-    // Navigate to chat
-    navigation.navigate("Chat", { recipientName: item.name });
-  };
+  const handleMatch = async (item) => {
+  await acceptMatch(item.requestId);
 
+  navigation.navigate("Chat", {
+    recipientName: item.name,
+    recipientId: item.id,
+  });
+};
+  
   const renderMatchNotification = ({ item }) => (
     <View style={[styles.notificationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.notificationInfo}>
