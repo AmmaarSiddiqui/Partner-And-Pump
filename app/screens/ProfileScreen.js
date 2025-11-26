@@ -2,13 +2,37 @@ import React, { useLayoutEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../state/useAuthContext";
+import { signOut } from "firebase/auth";
 import { ActivityIndicator } from "react-native";
 import { useMatches } from "../state/useMatchesContext";
+import { auth } from "../services/firebase"; 
+import AsyncStorage from "@react-native-async-storage/async-storage"; 
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { user, profile } = useAuth(); // trust the provider
   const { matches, cancelMatch } = useMatches();
+  // inside ProfileScreen:
+const handleLogout = async () => {
+  console.log("[Profile] logout pressed");
+
+  try {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      await AsyncStorage.removeItem(`profile:${uid}`);
+    }
+  } catch (e) {
+    console.warn("[Profile] clear cache error:", e);
+  }
+
+  try {
+    await signOut(auth);
+    console.log("[Profile] signOut done");
+  } catch (e) {
+    console.warn("[Profile] logout error:", e);
+  }
+};
+
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -139,6 +163,12 @@ export default function ProfileScreen() {
             ))
           )}
         </Card>
+
+                {/* Logout button at bottom */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
@@ -286,4 +316,18 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   cancelBtnText: { color: "#ef4444", fontWeight: "800" },
+  logoutBtn: {
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#b91c1c",
+    alignItems: "center",
+    backgroundColor: "rgba(248, 113, 113, 0.06)",
+  },
+  logoutText: {
+    color: "#fca5a5",
+    fontWeight: "700",
+  },
+
 });
