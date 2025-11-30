@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GitStory Dashboard</title>
+    <link rel="stylesheet" href="../static/styles.css">
+</head>
+<body>
+    <h1>GitStory Dashboard</h1>
+
+    <section>
+        <h2>AI Summary</h2>
+        <p><h1>Repository Analysis</h1>
+<h2>Executive Summary</h2>
+<p>This analysis covers 102 commits, revealing a primary development focus on building new user-facing screens for a matching application. While 9.8% of commits introduced new features like the <code>MatchScreen</code> and <code>Profile</code> systems, 80.4% of commits were uncategorized, with commit messages indicating a high volume of subsequent, reactive fixes to these same areas. This suggests a rapid feature introduction phase followed by a period of instability and stabilization, with a notable lack of explicit testing and refactoring activity.</p>
+<h2>Development Focus</h2>
+<p>Development was overwhelmingly concentrated on building and fixing core user interface screens, with no single file path consistently provided in commit messages. Based on the content of the 102 commits:
+- <strong>Matching &amp; Discovery Features:</strong> Approximately 45% of effort was directed towards the <code>MatchScreen</code>, <code>DiscoverScreen</code>, and <code>MatchListScreen</code>. This includes both the initial feature commits and the subsequent high volume of "other" commits with messages like "Fixed the match screens" and "Long-Term Screen fixed".
+- <strong>User Profile Management:</strong> Approximately 25% of effort was focused on the profile creation and editing flow. This is evidenced by commits like "Added the profile/edit profile screens" and numerous follow-up fixes such as "Fix profile create issue, profile loading issue".
+- <strong>Project Scaffolding &amp; Documentation:</strong> Approximately 15% of effort went into foundational work, including CI/CD workflow creation (<code>Add workflows</code>), <code>package.json</code> setup, and README updates.</p>
+<p>The development pattern indicates a shift from initial setup and documentation towards rapid UI feature implementation, which was immediately followed by a focus on fixing bugs in those newly created features.</p>
+<h2>Major Technical Changes</h2>
+<ol>
+<li>
+<p><strong>Introduction of Core UI Screens</strong></p>
+<ul>
+<li><strong>Change:</strong> Three major user-facing screens were introduced: <code>DiscoverScreen</code> (by Eshan Rathi), <code>MatchListScreen</code> (by Eshan Rathi), and <code>profile/edit profile</code> screens (by Mohamed Mahamed).</li>
+<li><strong>Technical Approach:</strong> These features were added via 4 distinct <code>feature</code> commits. However, they were immediately followed by at least 10 "other" commits from 5 different contributors to address functional issues, indicating potential integration challenges or incomplete initial implementations.</li>
+<li><strong>Impact:</strong> These screens form the foundational user experience of the application but have also been the primary source of instability and churn.</li>
+</ul>
+</li>
+<li>
+<p><strong>Large-Scale File Ingestion</strong></p>
+<ul>
+<li><strong>Change:</strong> Three commits titled "Add files via upload" ([91a518a3], [0801a405], [389cc353]) by <code>johnk69275</code> and <code>AmmaarSiddiqui</code> were logged as <code>feature</code> commits.</li>
+<li><strong>Technical Impact:</strong> These commits are the likely source of the 10,266,264 total lines changed, suggesting the addition of large assets, compiled artifacts, or vendor libraries directly into the repository.</li>
+<li><strong>Risk:</strong> This practice dramatically increases repository size, slows down clone and CI processes, and obscures the actual source code changes. It represents a significant repository health risk.</li>
+</ul>
+</li>
+<li>
+<p><strong>Initial CI/CD Workflow Setup</strong></p>
+<ul>
+<li><strong>Change:</strong> A <code>feature</code> commit [35e9976e] by <code>John Kim</code> introduced CI/CD "workflows".</li>
+<li><strong>Technical Impact:</strong> This is a foundational step towards automated testing and deployment. While a single commit, it provides the architectural underpinning for improving code quality and release reliability. The value of this setup is currently unrealized due to the low test coverage.</li>
+</ul>
+</li>
+</ol>
+<h2>Code Health Signals</h2>
+<ul>
+<li><strong>Bug Fix Rate:</strong> A formal <code>fix</code> commit type is not used. However, the "other" category (80.4% of all commits) is dominated by messages containing "Fixed...", implying a very high rate of reactive bug fixing. The pattern is consistently <code>feature</code> -&gt; <code>other</code> (fix) -&gt; <code>other</code> (fix), suggesting new code is being merged before it is stable.</li>
+<li><strong>Refactoring Activity:</strong> Only one commit (1.0%) was marked as <code>refactor</code>, and it targeted a documentation file (<code>DeveloperDocument.md</code>). This indicates a near-zero investment in proactive code restructuring or quality improvement during this period.</li>
+<li><strong>Test Coverage Signals:</strong> Testing is a critical weakness. Only 3 commits (2.9%) relate to tests. One commit [0859b398] updated test instructions, while another [bf47dfc8] explicitly <em>removed</em> a test and its associated function (<code>Removed matchService function and testing because it was not ready yet</code>). This is a strong negative signal, indicating a deprioritization of testing.</li>
+<li><strong>Hot Spots:</strong> The <code>MatchScreen</code> and the profile creation/loading flow are clear hot spots. These areas received at least 8 distinct fix-related commits from multiple developers (<code>John Kim</code>, <code>Masroor Siddiqui</code>, <code>AmmaarSiddiqui</code>) in rapid succession, pointing to high complexity, instability, and potential architectural issues.</li>
+</ul>
+<h2>Team Dynamics</h2>
+<ul>
+<li><strong>Primary Contributors:</strong> <code>AmmaarSiddiqui</code> (41 commits, 40.2%) and <code>johnk69275</code> (26 commits, 25.5%) are the project's core contributors, accounting for 65.7% of all activity. Their work includes merges, large file uploads, and fixes.</li>
+<li><strong>Collaboration Indicators:</strong> The "swarming" on hot spots like <code>MatchScreen</code> demonstrates active collaboration. The frequent <code>Merge pull request</code> commits show that a PR-based workflow is in place. However, the quality of what is being merged appears to be low, requiring immediate follow-up fixes.</li>
+<li><strong>Knowledge Distribution:</strong> Knowledge appears concentrated in the two primary contributors, who handle the majority of merges and foundational commits. Feature work is more distributed across <code>Eshan Rathi</code>, <code>Mohamed Mahamed</code>, and <code>Yasir Abdulgani</code>, but the subsequent stabilization effort often involves the core contributors. This creates a potential knowledge bottleneck.</li>
+</ul>
+<h2>Forward-Looking Assessment</h2>
+<ul>
+<li><strong>Areas Needing Attention:</strong><ol>
+<li><strong>Testing Strategy:</strong> The project's most significant risk is the lack of a testing culture. The active removal of tests must be reversed. A formal strategy for adding unit and integration tests, particularly for the unstable <code>MatchScreen</code> and profile modules, is required to achieve stability.</li>
+<li><strong>Commit Discipline:</strong> The 80.4% "other" commit category obscures project metrics. Adopting a conventional commit standard (e.g., <code>feat</code>, <code>fix</code>, <code>chore</code>) would provide clear data on the ratio of new work to maintenance.</li>
+<li><strong>Repository Contents:</strong> An audit is needed to identify and remove large binary files or vendor libraries committed in the "Add files via upload" commits. These should be managed via a package manager or Git LFS.</li>
+</ol>
+</li>
+<li><strong>Architectural Direction:</strong> The project is moving toward a feature-complete user application. The introduction of CI workflows is a positive step, but it must be paired with a commitment to automated testing to be effective. The current trajectory is one of rapid, unstable feature growth.</li>
+<li><strong>Recommendations for New Contributors:</strong> The best entry point would be to add test coverage for existing, unstable features. Specifically, writing tests for the profile creation flow and the <code>MatchScreen</code> functionality would provide immense value and help stabilize the codebase before more features are added.</li>
+</ul></p>
+        <small>Model: gemini-2.5-pro, Tokens used: 6026</small>
+    </section>
+
+    <section>
+        <h2>Repository Stats</h2>
+        <p>Total commits: 102</p>
+        <h3>Commits by type:</h3>
+        <ul>
+        
+            <li>feature: 10</li>
+        
+            <li>refactor: 1</li>
+        
+            <li>docs: 5</li>
+        
+            <li>test: 3</li>
+        
+            <li>chore: 1</li>
+        
+            <li>other: 82</li>
+        
+        </ul>
+
+        <h3>Commits by author:</h3>
+        <ul>
+        
+            <li>John Kim: 9 commits</li>
+        
+            <li>AmmaarSiddiqui: 41 commits</li>
+        
+            <li>Masroor Siddiqui: 10 commits</li>
+        
+            <li>johnk69275: 26 commits</li>
+        
+            <li>Yasirabdulgani: 4 commits</li>
+        
+            <li>Mohamed Mahamed: 1 commits</li>
+        
+            <li>mmxhamed: 1 commits</li>
+        
+            <li>Eshan Rathi: 3 commits</li>
+        
+            <li>eshan: 6 commits</li>
+        
+            <li>Yasir Abdulgani: 1 commits</li>
+        
+        </ul>
+    </section>
+
+    <section>
+        <h2>Commits</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Hash</th>
+                    <th>Author</th>
+                    <th>Timestamp</th>
+                    <th>Message</th>
+                    <th>Type</th>
+                    <th>Files Changed</th>
+                    <th>Changes</th>
+                </tr>
+            </thead>
+            <tbody>
+            
+                <tr>
+                    <td>90a3f478</td>
+                    <td>Mohamed Mahamed</td>
+                    <td>2025-11-02T12:15:57</td>
+                    <td>Added the profile/edit profile screens</td>
+                    <td>feature</td>
+                    <td>4</td>
+                    <td>293</td>
+                </tr>
+            
+                <tr>
+                    <td>c6980e44</td>
+                    <td>Eshan Rathi</td>
+                    <td>2025-11-01T15:18:53</td>
+                    <td>Added DiscoverScreen so people can view posts of others</td>
+                    <td>feature</td>
+                    <td>3</td>
+                    <td>162</td>
+                </tr>
+            
+                <tr>
+                    <td>da36fc9c</td>
+                    <td>Eshan Rathi</td>
+                    <td>2025-11-01T15:08:45</td>
+                    <td>Added MatchListScreen so users can now find people to match with</td>
+                    <td>feature</td>
+                    <td>5</td>
+                    <td>295</td>
+                </tr>
+            
+                <tr>
+                    <td>c22db794</td>
+                    <td>eshan</td>
+                    <td>2025-10-28T23:51:28</td>
+                    <td>Added a navigation bar and we can go from login screen to home screen</td>
+                    <td>feature</td>
+                    <td>1105</td>
+                    <td>57485</td>
+                </tr>
+            
+                <tr>
+                    <td>9211d129</td>
+                    <td>Yasir Abdulgani</td>
+                    <td>2025-10-28T23:26:43</td>
+                    <td>Add MatchScreen UI (Pump Now / Long-Term toggle + dark theme)</td>
+                    <td>feature</td>
+                    <td>22</td>
+                    <td>2274</td>
+                </tr>
+            
+                <tr>
+                    <td>91a518a3</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T22:16:24</td>
+                    <td>Add files via upload</td>
+                    <td>feature</td>
+                    <td>1</td>
+                    <td>131</td>
+                </tr>
+            
+                <tr>
+                    <td>35e9976e</td>
+                    <td>John Kim</td>
+                    <td>2025-10-28T18:01:38</td>
+                    <td>Add workflows</td>
+                    <td>feature</td>
+                    <td>35</td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td>0801a405</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-21T23:52:22</td>
+                    <td>Add files via upload</td>
+                    <td>feature</td>
+                    <td>1</td>
+                    <td>38</td>
+                </tr>
+            
+                <tr>
+                    <td>389cc353</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-20T21:25:11</td>
+                    <td>Add files via upload</td>
+                    <td>feature</td>
+                    <td>1</td>
+                    <td>183</td>
+                </tr>
+            
+                <tr>
+                    <td>d23bc5d5</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-15T20:30:44</td>
+                    <td>Add weekly status report for Week 1
+
+This report outlines the team's progress, issues, and goals for the first week of the project, detailing individual contributions and plans for the upcoming week.</td>
+                    <td>feature</td>
+                    <td>1</td>
+                    <td>131</td>
+                </tr>
+            
+                <tr>
+                    <td>3e260c96</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T23:55:55</td>
+                    <td>Refactor headings and structure in DeveloperDocument.md
+
+Updated headings and formatting in DeveloperDocument.md for clarity and consistency.</td>
+                    <td>refactor</td>
+                    <td>1</td>
+                    <td>16</td>
+                </tr>
+            
+                <tr>
+                    <td>bfffc89c</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-15T20:29:49</td>
+                    <td>Create readme.md</td>
+                    <td>docs</td>
+                    <td>1</td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td>84c9249b</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-15T19:59:30</td>
+                    <td>Revise README for Partner & Pump app
+
+Updated project description and goals from InternTrack to Partner & Pump, reflecting the new focus on finding gym partners.</td>
+                    <td>docs</td>
+                    <td>1</td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td>ef8e41ea</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-07T21:40:02</td>
+                    <td>Update README.md</td>
+                    <td>docs</td>
+                    <td>1</td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td>34ca2c07</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-07T20:56:09</td>
+                    <td>Update README.md</td>
+                    <td>docs</td>
+                    <td>1</td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td>065a6a98</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-07T18:55:30</td>
+                    <td>Update README.md</td>
+                    <td>docs</td>
+                    <td>1</td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td>0859b398</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T23:54:19</td>
+                    <td>Revise test and release build instructions
+
+Updated sections on adding tests and building a new release in the Developer Document.</td>
+                    <td>test</td>
+                    <td>1</td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td>10e430b0</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T19:50:45</td>
+                    <td>Merge branch 'main' of https://github.com/AmmaarSiddiqui/Partner-And-Pump
+Adds neccessary functions and tests.</td>
+                    <td>test</td>
+                    <td>1</td>
+                    <td>0</td>
+                </tr>
+            
+                <tr>
+                    <td>bf47dfc8</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T19:45:38</td>
+                    <td>Removed matchService function and testing because it was not ready yet. Added inputGuards function and testing. Added score function and testing.</td>
+                    <td>test</td>
+                    <td>9</td>
+                    <td>629</td>
+                </tr>
+            
+                <tr>
+                    <td>82b325c2</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-28T17:06:17</td>
+                    <td>Create package.json</td>
+                    <td>chore</td>
+                    <td>1</td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td>568da30f</td>
+                    <td>John Kim</td>
+                    <td>2025-11-12T04:50:22</td>
+                    <td>Fixed the match screens, added the match button functionality and the matched accounts in profile</td>
+                    <td>other</td>
+                    <td>7</td>
+                    <td>451</td>
+                </tr>
+            
+                <tr>
+                    <td>220d2205</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-05T11:32:26</td>
+                    <td>Merge pull request #15 from AmmaarSiddiqui/app/screens/MatchScreen.js
+
+Fixed Match Screen and added Sports to long-term and splits in edit</td>
+                    <td>other</td>
+                    <td>3</td>
+                    <td>92</td>
+                </tr>
+            
+                <tr>
+                    <td>de38f65d</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-11-05T11:24:33</td>
+                    <td>Fixed Match Screen and added Sports to long-term and splits in edit profile</td>
+                    <td>other</td>
+                    <td>3</td>
+                    <td>92</td>
+                </tr>
+            
+                <tr>
+                    <td>4a3d67d7</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-05T11:00:51</td>
+                    <td>Merge pull request #14 from AmmaarSiddiqui/app/screens/MatchScreen.js
+
+Long-Term Screen fixed</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td>c34c6802</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-11-05T10:55:35</td>
+                    <td>Long-Term Screen fixed</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td>1f7534aa</td>
+                    <td>johnk69275</td>
+                    <td>2025-11-05T05:30:47</td>
+                    <td>Merge pull request #13 from AmmaarSiddiqui/fix-create-profile
+
+Fix issue of loading when not logged in</td>
+                    <td>other</td>
+                    <td>3508</td>
+                    <td>649925</td>
+                </tr>
+            
+                <tr>
+                    <td>459a72bb</td>
+                    <td>John Kim</td>
+                    <td>2025-11-05T05:29:33</td>
+                    <td>Fix issue of loading when not logged in</td>
+                    <td>other</td>
+                    <td>3508</td>
+                    <td>649925</td>
+                </tr>
+            
+                <tr>
+                    <td>5127dc56</td>
+                    <td>Yasirabdulgani</td>
+                    <td>2025-11-05T01:58:55</td>
+                    <td>Merge pull request #12 from AmmaarSiddiqui/fix-create-profile
+
+Fix profile create issue, profile loading issue, and match-now issue
+
+Looks great, solid cleanup overall. Removing the early return in Au...</td>
+                    <td>other</td>
+                    <td>9</td>
+                    <td>523</td>
+                </tr>
+            
+                <tr>
+                    <td>1bff83cb</td>
+                    <td>John Kim</td>
+                    <td>2025-11-05T01:51:26</td>
+                    <td>Fix profile create issue, profile loading issue, and match-now issue</td>
+                    <td>other</td>
+                    <td>9</td>
+                    <td>523</td>
+                </tr>
+            
+                <tr>
+                    <td>68503210</td>
+                    <td>Yasirabdulgani</td>
+                    <td>2025-11-05T00:01:40</td>
+                    <td>Merge pull request #11 from AmmaarSiddiqui/implement-profile-backend
+
+Profile options look good, fix the bug where you are taken to the create profile page when you should not be.</td>
+                    <td>other</td>
+                    <td>137</td>
+                    <td>10029</td>
+                </tr>
+            
+                <tr>
+                    <td>d0838dea</td>
+                    <td>John Kim</td>
+                    <td>2025-11-04T23:58:06</td>
+                    <td>connected profile backend</td>
+                    <td>other</td>
+                    <td>137</td>
+                    <td>10029</td>
+                </tr>
+            
+                <tr>
+                    <td>b6801ab2</td>
+                    <td>johnk69275</td>
+                    <td>2025-11-04T23:52:48</td>
+                    <td>Update Expo setup instructions in DeveloperDocument
+
+Added instructions to download and use Expo Go app.</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td>f5b8ea79</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-04T22:13:55</td>
+                    <td>Update DeveloperDocument.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td>38ce29b3</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-04T22:13:38</td>
+                    <td>Update DeveloperDocument.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td>fd24f892</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-04T22:12:53</td>
+                    <td>Update DeveloperDocument.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>74</td>
+                </tr>
+            
+                <tr>
+                    <td>d15a9606</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-04T21:53:43</td>
+                    <td>Update DeveloperDocument.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>44</td>
+                </tr>
+            
+                <tr>
+                    <td>850ce9a5</td>
+                    <td>johnk69275</td>
+                    <td>2025-11-03T22:35:30</td>
+                    <td>Merge pull request #10 from AmmaarSiddiqui/feature/profile-screens
+
+Profile and edit profile screens look good, could look to add more settings later once we implement more features.</td>
+                    <td>other</td>
+                    <td>4</td>
+                    <td>293</td>
+                </tr>
+            
+                <tr>
+                    <td>4ee5bc17</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-11-03T18:13:27</td>
+                    <td>Week 4 Report</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>232</td>
+                </tr>
+            
+                <tr>
+                    <td>d0a45609</td>
+                    <td>mmxhamed</td>
+                    <td>2025-11-02T11:04:44</td>
+                    <td>Merge pull request #9 from AmmaarSiddiqui/navigation
+
+Added new screens and configured all screens to dark theme</td>
+                    <td>other</td>
+                    <td>11</td>
+                    <td>840</td>
+                </tr>
+            
+                <tr>
+                    <td>6b277b47</td>
+                    <td>Eshan Rathi</td>
+                    <td>2025-11-01T14:25:33</td>
+                    <td>Updated theme to dark theme on ProfileCreateScreen and HomeScreen</td>
+                    <td>other</td>
+                    <td>5</td>
+                    <td>385</td>
+                </tr>
+            
+                <tr>
+                    <td>fab48da3</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-30T02:19:02</td>
+                    <td>Rename User Manual to Developer Manual</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td>446645b0</td>
+                    <td>Yasirabdulgani</td>
+                    <td>2025-10-28T23:58:33</td>
+                    <td>Merge pull request #6 from AmmaarSiddiqui/navigation
+
+Fixed issue with login screen not going to home screen and setup navbar 
+Tested and looked through code. Looks good make sure to add icon later.</td>
+                    <td>other</td>
+                    <td>1105</td>
+                    <td>57485</td>
+                </tr>
+            
+                <tr>
+                    <td>2655add4</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T23:54:49</td>
+                    <td>Update headings in DeveloperDocument.md for clarity</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td>fc404dfa</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T23:53:21</td>
+                    <td>Update DeveloperDocument.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>52</td>
+                </tr>
+            
+                <tr>
+                    <td>71abaeb1</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T23:52:39</td>
+                    <td>Create DeveloperDocument.md with guidelines and instructions
+
+Added comprehensive user manual and developer guidelines for Partner & Pump project.</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>219</td>
+                </tr>
+            
+                <tr>
+                    <td>2029782c</td>
+                    <td>Yasirabdulgani</td>
+                    <td>2025-10-28T23:30:33</td>
+                    <td>Merge pull request #5 from AmmaarSiddiqui/match-ui
+
+Added MatchScreen UI (Pump Now / Long-Term toggle + dark theme)</td>
+                    <td>other</td>
+                    <td>22</td>
+                    <td>2274</td>
+                </tr>
+            
+                <tr>
+                    <td>9db48137</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T23:03:16</td>
+                    <td>Delete docs directory</td>
+                    <td>other</td>
+                    <td>2</td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td>15ae398d</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T22:39:04</td>
+                    <td>Merge pull request #4 from AmmaarSiddiqui/sendNotification-implemetation-and-testing
+
+Created senNotification method and testing</td>
+                    <td>other</td>
+                    <td>2</td>
+                    <td>245</td>
+                </tr>
+            
+                <tr>
+                    <td>a2e0951a</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T22:35:41</td>
+                    <td>Created senNotification method and testing</td>
+                    <td>other</td>
+                    <td>2</td>
+                    <td>245</td>
+                </tr>
+            
+                <tr>
+                    <td>00d7ca0f</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T22:20:20</td>
+                    <td>Merge branch 'main' of https://github.com/AmmaarSiddiqui/Partner-And-Pump
+Necessary for now.</td>
+                    <td>other</td>
+                    <td>41</td>
+                    <td>1318</td>
+                </tr>
+            
+                <tr>
+                    <td>8c42a4d7</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-28T22:19:46</td>
+                    <td>Merge pull request #3 from AmmaarSiddiqui/feature/cleanup
+
+All good cleanup</td>
+                    <td>other</td>
+                    <td>39</td>
+                    <td>925</td>
+                </tr>
+            
+                <tr>
+                    <td>27fd4a1a</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T22:19:14</td>
+                    <td>removed iOS CI testing to fix it. Also added .gitignore file</td>
+                    <td>other</td>
+                    <td>2</td>
+                    <td>28</td>
+                </tr>
+            
+                <tr>
+                    <td>61fc20f5</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T22:16:58</td>
+                    <td>Delete docs/USERMANUAL.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>131</td>
+                </tr>
+            
+                <tr>
+                    <td>8a20f3bb</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T22:16:43</td>
+                    <td>Rename USERMANUAL (1).md to USERMANUAL.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>262</td>
+                </tr>
+            
+                <tr>
+                    <td>2c89df21</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T22:14:55</td>
+                    <td>Update USERMANUAL.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td>ca5be78a</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T22:13:53</td>
+                    <td>Update USERMANUAL.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>55</td>
+                </tr>
+            
+                <tr>
+                    <td>145f2768</td>
+                    <td>John Kim</td>
+                    <td>2025-10-28T21:56:43</td>
+                    <td>final: complete firebase and login/signup</td>
+                    <td>other</td>
+                    <td>39</td>
+                    <td>925</td>
+                </tr>
+            
+                <tr>
+                    <td>b3d3aa38</td>
+                    <td>John Kim</td>
+                    <td>2025-10-28T21:45:37</td>
+                    <td>Merge branch 'main' of https://github.com/AmmaarSiddiqui/Partner-And-Pump into feature/firebase-bootstrap</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>51</td>
+                </tr>
+            
+                <tr>
+                    <td>d976251e</td>
+                    <td>AmmaarSiddiqui</td>
+                    <td>2025-10-28T21:45:27</td>
+                    <td>Merge pull request #2 from AmmaarSiddiqui/feature/firebase-bootstrap
+
+iOS CI Tests not working (in-progress fix at the moment). Did a lookthrough important parts of code, and it looks fine. Make sure ...</td>
+                    <td>other</td>
+                    <td>33984</td>
+                    <td>4401723</td>
+                </tr>
+            
+                <tr>
+                    <td>e08bf3cc</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T21:40:08</td>
+                    <td>Potential Fix for iOS CI tests</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>51</td>
+                </tr>
+            
+                <tr>
+                    <td>9e4ccfb2</td>
+                    <td>John Kim</td>
+                    <td>2025-10-28T21:27:14</td>
+                    <td>Merge branch 'main' of https://github.com/AmmaarSiddiqui/Partner-And-Pump into feature/firebase-bootstrap</td>
+                    <td>other</td>
+                    <td>12</td>
+                    <td>4617</td>
+                </tr>
+            
+                <tr>
+                    <td>33ce0aee</td>
+                    <td>John Kim</td>
+                    <td>2025-10-28T21:21:26</td>
+                    <td>final: complete firebase and login/signup</td>
+                    <td>other</td>
+                    <td>33984</td>
+                    <td>4401723</td>
+                </tr>
+            
+                <tr>
+                    <td>ff565a1e</td>
+                    <td>eshan</td>
+                    <td>2025-10-28T20:23:01</td>
+                    <td>Merge branch 'main' of https://github.com/AmmaarSiddiqui/Partner-And-Pump</td>
+                    <td>other</td>
+                    <td>2</td>
+                    <td>3863</td>
+                </tr>
+            
+                <tr>
+                    <td>bb9db5e9</td>
+                    <td>eshan</td>
+                    <td>2025-10-28T20:22:52</td>
+                    <td>Moved and Updated USERMANUAL.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>250</td>
+                </tr>
+            
+                <tr>
+                    <td>a00dcb12</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T20:04:06</td>
+                    <td>Second potential fix for CI testing</td>
+                    <td>other</td>
+                    <td>2</td>
+                    <td>3850</td>
+                </tr>
+            
+                <tr>
+                    <td>ba6ec5e1</td>
+                    <td>Masroor Siddiqui</td>
+                    <td>2025-10-28T19:59:56</td>
+                    <td>Potential Fix for CI testing</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td>015a1b9b</td>
+                    <td>eshan</td>
+                    <td>2025-10-28T19:53:20</td>
+                    <td>Merge branch 'main' of https://github.com/AmmaarSiddiqui/Partner-And-Pump</td>
+                    <td>other</td>
+                    <td>9</td>
+                    <td>629</td>
+                </tr>
+            
+                <tr>
+                    <td>5aa890c6</td>
+                    <td>eshan</td>
+                    <td>2025-10-28T19:53:09</td>
+                    <td>Update user-manual.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>125</td>
+                </tr>
+            
+                <tr>
+                    <td>c3820cef</td>
+                    <td>eshan</td>
+                    <td>2025-10-28T19:45:29</td>
+                    <td>Create user-manual.md</td>
+                    <td>other</td>
+                    <td>1</td>
+                    <td>0</td>
+                </tr>
+            
+                <tr>
+                    <td>5252d0b4</td>
+                    <td>johnk69275</td>
+                    <td>2025-10-28T18:05:03</td>
+                    <td>Merge pull request #1 from AmmaarSiddiqui/add-directories
+
+Add workflows</td>
+                    <td>other</td>
+                    <td>35</td>
+                    <td>6</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </section>
+
+    <script src="../static/script.js"></script>
+</body>
+</html>

@@ -1,87 +1,190 @@
-import React, { useLayoutEffect, useState } from "react";
-import { View, FlatList, StyleSheet, Text } from "react-native";
+// app/screens/MatchListScreen.js
+
+import React, { useLayoutEffect, useEffect, useState } from "react";
+import { View, FlatList, StyleSheet, Text, ActivityIndicator } from "react-native";
 import { useTheme } from "@react-navigation/native";
-import UserCard from "../components/UserCard";
+import { collection, getDocs, query, where } from "firebase/firestore";
+
+
+import { auth, db } from "../services/firebase";
+import { useAuth } from "../state/useAuthContext";
 import { useMatches } from "../state/useMatchesContext";
-
-// Mock users organized by mode -> category
-const MOCK_BY_MODE_AND_CATEGORY = {
-  pumpNow: {
-    Push: [
-      { id: "pn-push-1", name: "Alex Rivera", age: 24, bio: "Dedicated to strength training and staying fit.", tags: ["Push"] },
-      { id: "pn-push-2", name: "Maya Patel", age: 26, bio: "Bench and overhead press day fanatic.", tags: ["Push"] },
-      { id: "pn-push-3", name: "Ethan Brooks", age: 28, bio: "Loves chest/shoulder supersets.", tags: ["Push"] },
-    ],
-    Legs: [
-      { id: "pn-legs-1", name: "Jordan Kim", age: 25, bio: "Big on squats and lunges.", tags: ["Legs"] },
-      { id: "pn-legs-2", name: "Sara Nguyen", age: 23, bio: "Chasing a 2xBW squat.", tags: ["Legs"] },
-      { id: "pn-legs-3", name: "Diego Torres", age: 29, bio: "Quad pump enthusiast.", tags: ["Legs"] },
-    ],
-    Sports: [
-      { id: "pn-sports-1", name: "Priya Shah", age: 22, bio: "Pickup soccer after lifts.", tags: ["Sports"] },
-      { id: "pn-sports-2", name: "Noah Williams", age: 30, bio: "Basketball + mobility.", tags: ["Sports"] },
-    ],
-    Cardio: [
-      { id: "pn-cardio-1", name: "Ava Chen", age: 27, bio: "Intervals and incline walks.", tags: ["Cardio"] },
-      { id: "pn-cardio-2", name: "Liam Park", age: 24, bio: "Row + assault bike mix.", tags: ["Cardio"] },
-    ],
-    "Full Body": [
-      { id: "pn-full-1", name: "Marcus Lee", age: 27, bio: "Compound circuits, minimal rest.", tags: ["Full Body"] },
-      { id: "pn-full-2", name: "Sofia Alvarez", age: 23, bio: "EMOM style sessions.", tags: ["Full Body"] },
-    ],
-    Yoga: [
-      { id: "pn-yoga-1", name: "Nina Gupta", age: 25, bio: "Vinyasa and deep stretch.", tags: ["Yoga"] },
-      { id: "pn-yoga-2", name: "Owen Davis", age: 31, bio: "Recovery flows post-lift.", tags: ["Yoga"] },
-    ],
-  },
-
-  longTerm: {
-    "Push/Pull/Legs": [
-      { id: "lt-ppl-1", name: "Alex Rivera", age: 24, bio: "3-day PPL rotation focused on progression.", tags: ["PPL"], scheduleDays: ["Mon", "Wed", "Fri"] },
-      { id: "lt-ppl-2", name: "Hannah Moore", age: 26, bio: "Waves volume across P/P/L.", tags: ["PPL"], scheduleDays: ["Tue", "Thu"] },
-    ],
-    "Upper/Lower": [
-      { id: "lt-ul-1", name: "Jordan Kim", age: 25, bio: "ULUL 4x/week strength split.", tags: ["Upper/Lower"], scheduleDays: ["Mon", "Thu"] },
-      { id: "lt-ul-2", name: "Theo Wright", age: 28, bio: "Powerbuilding upper/lower plan.", tags: ["Upper/Lower"], scheduleDays: ["Tue", "Fri"] },
-    ],
-    "Full Body": [
-      { id: "lt-full-1", name: "Priya Shah", age: 22, bio: "FB 3x/week minimalist strength.", tags: ["Full Body"], scheduleDays: ["Wed", "Sat"] },
-      { id: "lt-full-2", name: "Miles Carter", age: 29, bio: "Daily undulating FB program.", tags: ["Full Body"], scheduleDays: ["Mon", "Fri", "Sun"] },
-    ],
-    "Bro Split": [
-      { id: "lt-bro-1", name: "Marcus Lee", age: 27, bio: "Classic chest/back/legs/arms/shoulders.", tags: ["Bro"], scheduleDays: ["Mon", "Tue", "Thu"] },
-      { id: "lt-bro-2", name: "Sofia Alvarez", age: 23, bio: "Hypertrophy-focused 5-day split.", tags: ["Bro"], scheduleDays: ["Wed", "Fri"] },
-    ],
-  },
-};
-
+import UserCard from "../components/UserCard";
+import {
+  computeCompatibilityScore,
+  buildProfileTags,
+} from "../services/matching/compatibilityScore";
 export default function MatchListScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { category, mode } = route.params;
+  const { category, mode } = route.params; // "pumpNow" | "longTerm"
+  const { profile } = useAuth();           // 👈 this is *me*
   const { addMatch } = useMatches();
-  const [matchedIds, setMatchedIds] = useState(new Set());
+
+  const [sentIds, setSentIds] = useState(new Set());
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useLayoutEffect(() => {
     const modeText = mode === "pumpNow" ? "Same-Day" : "Long-Term";
     navigation.setOptions({ title: `${category} — ${modeText}` });
   }, [navigation, category, mode]);
 
-  const data = MOCK_BY_MODE_AND_CATEGORY[mode]?.[category] ?? [];
+  useEffect(() => {
+  let isMounted = true;
+
+  // still loading my own profile? don't try to match yet
+  if (profile === undefined) {
+    return;
+  }
+
+  const loadMatches = async () => {
+    setLoading(true);
+    try {
+      const myUid = auth.currentUser?.uid || null;
+      if (!myUid) {
+        if (isMounted) {
+          setData([]);
+          setSentIds(new Set());
+        }
+        return;
+      }
+
+      // 0) Find all confirmed matches for me -> exclude these people
+      const matchesSnap = await getDocs(
+        query(
+          collection(db, "matches"),
+          where("users", "array-contains", myUid)
+        )
+      );
+
+      const matchedPartnerIds = new Set();
+      matchesSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const users = Array.isArray(data.users) ? data.users : [];
+        users.forEach((u) => {
+          if (u !== myUid) {
+            matchedPartnerIds.add(u);
+          }
+        });
+      });
+
+      // 1) Find all sent match requests (outgoing) for this mode+category
+      const sentSnap = await getDocs(
+        query(
+          collection(db, "matchRequests"),
+          where("fromUserId", "==", myUid),
+          where("mode", "==", mode),
+          where("category", "==", category),
+          where("status", "==", "pending")
+        )
+      );
+
+      const newSentIds = new Set();
+      sentSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.toUserId) {
+          newSentIds.add(data.toUserId);
+        }
+      });
+
+      if (!isMounted) return;
+      setSentIds(newSentIds);
+
+      // 2) get ALL profiles from Firestore
+      const snap = await getDocs(collection(db, "profiles"));
+      const allProfiles = [];
+      snap.forEach((docSnap) => {
+        allProfiles.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      // 3) split: me vs others, and exclude people I'm already matched with
+      const others = allProfiles.filter(
+        (p) => p.id !== myUid && !matchedPartnerIds.has(p.id)
+      );
+
+      let result;
+
+      if (!profile) {
+        // logged in but no profile data yet: just show others, no score
+        result = others.map((p) => ({
+          id: p.id,
+          name: p.name || "Gym partner",
+          age: p.age || null,
+          bio: p.about || "",
+          tags: buildProfileTags(p, { mode }),
+          scheduleDays: Array.isArray(p.days) ? p.days : [],
+          score: 0,
+        }));
+      } else {
+        // we have *me* (my profile) → compare me vs each other
+        result = others
+          .map((p) => {
+            const rawScore = computeCompatibilityScore(profile, p, { mode, category });
+            const score = Math.round((rawScore / 10) * 100);
+            return {
+              id: p.id,
+              name: p.name || "Gym partner",
+              age: p.age || null,
+              bio: p.about || "",
+              tags: buildProfileTags(p, { mode }),
+              scheduleDays: Array.isArray(p.days) ? p.days : [],
+              score,
+            };
+          })
+          .filter((m) => m.score > 0)
+          .sort((a, b) => b.score - a.score);
+      }
+
+      if (isMounted) {
+        setData(result);
+      }
+    } catch (e) {
+      console.warn("[MatchList] load error:", e);
+      if (isMounted) setData([]);
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  loadMatches();
+  return () => {
+    isMounted = false;
+  };
+}, [mode, category, profile]);
+
 
   const handleMatch = (item) => {
-    setMatchedIds((prev) => {
-      const next = new Set(prev);
-      next.add(item.id);
-      return next;
-    });
-    addMatch({
-      id: item.id,
-      name: item.name,
-      category,
-      mode,
-      days: item.scheduleDays ?? [],
-    });
-  };
+  // Optimistic UI: mark as "sent" immediately
+  setSentIds((prev) => {
+    const next = new Set(prev);
+    next.add(item.id);
+    return next;
+  });
+
+  // Actually send match request
+  addMatch({
+    id: item.id,
+    name: item.name,
+    category,
+    mode,
+    days: item.scheduleDays ?? [],
+  });
+};
+
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, alignItems: "center", justifyContent: "center" },
+        ]}
+      >
+        <ActivityIndicator />
+        <Text style={{ color: colors.text, marginTop: 8 }}>Finding your best matches…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -97,12 +200,13 @@ export default function MatchListScreen({ route, navigation }) {
             <UserCard
               name={item.name}
               age={item.age}
+              score={item.score}
               bio={item.bio}
-              // For long-term, show the day chips as additional small tags
-              tags={mode === "longTerm" ? [...item.tags, ...(item.scheduleDays || [])] : item.tags}
-              isMatched={matchedIds.has(item.id)}
+              tags={item.tags}
+              isMatched={sentIds.has(item.id)}    
               onMatch={() => handleMatch(item)}
             />
+
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
@@ -116,3 +220,4 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { padding: 20 },
 });
+
