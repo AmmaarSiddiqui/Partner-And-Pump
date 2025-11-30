@@ -5,6 +5,7 @@ import { useAuth } from "../state/useAuthContext";
 import { auth, db } from "../services/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import PlaceAutocomplete from "../components/PlaceAutocomplete"; // Yasir: Google Places autocomplete
 const GOAL_OPTIONS = ["Strength", "Aesthetics", "Health", "Weight-loss", "Endurance", "Sports"];
 const TIME_OPTIONS = [
   "Morning (5AM–9AM)",
@@ -123,12 +124,15 @@ const save = async () => {
       <DaysPicker selected={days} onToggle={toggleDay} />
 
       <Label>Primary gym</Label>
-      <TextInput
-        style={s.input}
-        value={gym}
-        onChangeText={setGym}
-        placeholder="LA Fitness - Downtown"
-        placeholderTextColor="#6b7280"
+      {/* ✅ Yasir - Autocomplete instead of plain text */}
+      <PlaceAutocomplete
+      placeholder="LA Fitness - Downtown"
+      initialValue={gym}
+    onSelect={(place) => {
+    // place = { name, address, location: { lat, lng } }
+    console.log("Selected Place:", place)
+    setGym(place.name); // store gym name like before
+  }}
       />
 
       <Label>Fitness level</Label>
