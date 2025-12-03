@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../state/useAuthContext";
 import { auth, db } from "../services/firebase";
+import { signOut } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PlaceAutocomplete from "../components/PlaceAutocomplete"; // Yasir: Google Places autocomplete

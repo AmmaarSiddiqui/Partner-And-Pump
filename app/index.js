@@ -21,6 +21,8 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
+
+
 export default function Index() {
   const [booting, setBooting] = useState(true);
   const [user, setUser] = useState(null);
@@ -110,6 +112,15 @@ export default function Index() {
       Alert.alert("Sign up failed", e.message);
     }
   };
+  return (
+    <AuthProvider>
+      <MatchesProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </MatchesProvider>
+    </AuthProvider>
+  );
 
   const onLogin = async () => {
     if (!email.trim() || !password) {
