@@ -40,4 +40,4 @@ if (Platform.OS === "web") {
 const db = getFirestore(app);
 setLogLevel("error");
 
-export { app, auth, db };
+export { app, auth, db, firebaseConfig };//config added
