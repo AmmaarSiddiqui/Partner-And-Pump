@@ -35,7 +35,6 @@ Partner-And-Pump/
 ├─ functions/
 │  ├─ __tests__/
 │  ├─ src/
-│  │  ├─ match/
 │  │  ├─ notifications/
 │  │  └─ validation/
 │  ├─ jest.config.js
@@ -47,6 +46,7 @@ Partner-And-Pump/
 ├─ src/
 ├─ .gitignore
 ├─ App.js
+├─ .env.example
 ├─ DeveloperDocument.md
 ├─ README.md
 ├─ USERMANUAL.md
