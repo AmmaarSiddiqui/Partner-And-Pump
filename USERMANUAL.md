@@ -70,7 +70,6 @@ Once the installation is complete, follow these steps to launch the app on your 
     Once the server starts, you will see a QR code generated in your terminal window.
     * **Open the Expo Go app** on your phone.
     * **Scan the QR Code:**
-        * **Android:** Use the "Scan QR Code" button inside the Expo Go app.
         * **iOS:** Use your standard Camera app to scan the QR code, which will prompt you to open Expo Go.
 
 3.  **App Initialization**
@@ -103,9 +102,11 @@ Here are the main features of Partner & Pump and how to use them.
 When you first visit the app, you'll need to create an account. You can sign up using your email address.
 
 During setup, you will be asked to fill out your profile with key information that we use for matching:
+* Your name
 * Your main fitness goals (e.g., strength, endurance, weight loss)
 * Your primary gym location (you can set this by enabling location access in your browser or searching manually)
-* Your weekly workout availability (you can set the days and time blocks you are usually free to work out)
+
+Afterwards, you can navigate to the profile to further update additional details for your profile. 
 
 ### Finding a Same-Day Partner ("Pump Now")
 Use this feature when you need a partner for a single session, right now or later today.
@@ -115,6 +116,7 @@ Use this feature when you need a partner for a single session, right now or late
 4.  A list of available users who match your criteria shows, click on match for the user who best matches your preferences.
 5.  Match request is sent and now you wait for the recipients response
 6.  When they accept, a new chat will automatically open in your messages tab so you can coordinate the details (e.g., "Meet by the squat racks at 5:30?").
+7.  To cancel a match, go to **Profile** and scroll down where you see your matches.
 
 ### Finding a Long-Term Partner
 Use this feature to find a consistent partner who matches your weekly routine and long-term goals.
@@ -124,6 +126,8 @@ Use this feature to find a consistent partner who matches your weekly routine an
 4.  A list of available users who match your criteria shows, click on match for the user who best matches your preferences.
 5.  Match request is sent and now you wait for the recipients response
 6.  When they accept, a new chat will automatically open in your messages tab so you can coordinate the details (e.g., "What days and times work best for you?").
+7.  To cancel a match, go to **Profile** and scroll down where you see your matches.
+
 
 ### The Discover Feed (In Development)
 The "**Discover**" tab is our community social feed. This is a place to share your fitness journey and get motivated by others.
@@ -139,8 +143,13 @@ You can send and receive direct messages within the app. A new chat thread is au
 
 All your active conversations are saved in the "**Messages**" tab. You can enable browser notifications in your settings to be alerted to new messages.
 
+
+
 ### Home Page
 You can see new match requests from users and see your current schedule down below for the day ahead.
+
+You can click on the left and right arrows to switch the days the schedule shows, and if you click add, you can add various things to your schedule by filling in the schedule subject field and time (Date is from the left and right arrows).
+You can edit/delete by clicking on entries in the schedule. 
 
 ### Upcoming Features
 We are actively working on new features. The following functionality is planned but is currently a **work in progress**:
