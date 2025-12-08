@@ -11,52 +11,99 @@ import {
 } from "react-native";
 import { useTheme } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { useAuth } from "../state/useAuthContext";
+import { db } from "../services/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function UploadScreen({ navigation }) {
   const { colors } = useTheme();
+  const { user, profile } = useAuth();
+
   const [imageUri, setImageUri] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
   const [caption, setCaption] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const pickImage = async () => {
-    // Ask for permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission required", "Please allow photo library access.");
       return;
     }
 
-    // Open picker
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 0.8,
+      quality: 0.4,           // keep small for Firestore
+      base64: true,           // 🔑 we need base64
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      setImageBase64(asset.base64 || null);
+    }
+  };
+
+  const uploadPost = async () => {
+    if (!user) {
+      Alert.alert("Not signed in", "You must be signed in to upload.");
+      return;
+    }
+
+    if (!imageBase64) {
+      Alert.alert("No image", "Please choose an image first.");
+      return;
+    }
+
+    const trimmedCaption = caption.trim();
+
+    try {
+      setUploading(true);
+
+      const uid = user.uid;
+      const postsRef = collection(db, "posts");
+
+      await addDoc(postsRef, {
+        userId: uid,
+        username:
+          profile?.username ||
+          profile?.displayName ||
+          profile?.name ||
+          user.email ||
+          "Unknown",
+        caption: trimmedCaption,
+        imageBase64,           // 🔑 store image directly in Firestore
+        createdAt: serverTimestamp(),
+      });
+
+      setUploading(false);
+      setImageUri(null);
+      setImageBase64(null);
+      setCaption("");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error creating post:", error);
+      setUploading(false);
+      Alert.alert("Upload failed", "Something went wrong. Please try again.");
     }
   };
 
   const confirmUpload = () => {
-    if (!imageUri) {
+    if (!imageBase64) {
       Alert.alert("Add an image first");
       return;
     }
 
-    Alert.alert(
-      "Confirm Upload",
-      "Are you sure you want to upload this post?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Upload",
-          onPress: () => {
-            console.log("Uploading post:", { imageUri, caption });
-            navigation.goBack();
-          },
+    Alert.alert("Confirm Upload", "Are you sure you want to upload this post?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Upload",
+        onPress: () => {
+          if (!uploading) uploadPost();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -70,13 +117,14 @@ export default function UploadScreen({ navigation }) {
           { backgroundColor: colors.card, borderColor: colors.border },
         ]}
         onPress={pickImage}
+        disabled={uploading}
       >
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.imagePreview} />
         ) : (
           <View style={styles.imagePlaceholderContent}>
             <Text style={[styles.imagePlaceholderText, { color: colors.text }]}>
-              Tap to choose an image
+              Tap to choose a small image
             </Text>
           </View>
         )}
@@ -93,21 +141,28 @@ export default function UploadScreen({ navigation }) {
           },
         ]}
         placeholder="Write a caption..."
-        placeholderTextColor={colors.text + "66"} // more visible
+        placeholderTextColor={colors.text + "66"}
         value={caption}
         onChangeText={setCaption}
         multiline
+        editable={!uploading}
       />
 
       {/* Upload Button */}
       <TouchableOpacity
         style={[
           styles.uploadButton,
-          { backgroundColor: colors.primary, opacity: imageUri ? 1 : 0.6 },
+          {
+            backgroundColor: colors.primary,
+            opacity: imageBase64 && !uploading ? 1 : 0.6,
+          },
         ]}
         onPress={confirmUpload}
+        disabled={!imageBase64 || uploading}
       >
-        <Text style={styles.uploadButtonText}>Upload</Text>
+        <Text style={styles.uploadButtonText}>
+          {uploading ? "Uploading..." : "Upload"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
