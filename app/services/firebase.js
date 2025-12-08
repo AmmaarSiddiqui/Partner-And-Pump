@@ -7,6 +7,7 @@ import {
 } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirestore, setLogLevel } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { Platform } from "react-native";
 
 console.log("[firebase] init");
@@ -41,4 +42,7 @@ if (Platform.OS === "web") {
 const db = getFirestore(app);
 setLogLevel("error");
 
+const storage = getStorage(app);
+
+export { app, auth, db, storage, firebaseConfig };//config added
 export { app, auth, db, firebaseConfig };
