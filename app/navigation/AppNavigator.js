@@ -23,6 +23,8 @@ import MessagesScreen from "../screens/MessagesScreen";
 import UploadScreen from "../screens/UploadScreen";
 import ChatScreen from "../screens/ChatScreen";
 import ProfileStack from "./ProfileStack";
+import AddScheduleScreen from "../screens/AddScheduleScreen";
+
 
 
 const Stack = createNativeStackNavigator();
@@ -161,6 +163,11 @@ export default function AppNavigator() {
             <Stack.Screen
               name="Chat"
               component={ChatScreen}
+            />
+            <Stack.Screen
+              name="AddSchedule"
+              component={AddScheduleScreen}
+              options={{ title: "Add to Schedule" }}
             />
             <Stack.Screen
             name="Upload"

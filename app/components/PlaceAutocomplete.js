@@ -1,4 +1,5 @@
 // app/components/PlaceAutocomplete.jsx
+// UI improved for clearer dropdown visibility
 
 import React, { useEffect, useRef, useState } from "react";
 import { View, TextInput, FlatList, Pressable, Text } from "react-native";
