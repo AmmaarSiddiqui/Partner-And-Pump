@@ -113,6 +113,13 @@ Make sure your phone and computer are on the same network.
 
 This will prebuild native projects and open the iOS Simulator.
 
+**NOTE**: 
+If you wish to run 2 devices at once, you will have to create an account on expo go and:
+```
+npx expo login
+```
+If you only want to use one device at a time, simply follow the prompt and procceed anonymously.
+
 
 3) Build & run the backend (Cloud Functions)
 
