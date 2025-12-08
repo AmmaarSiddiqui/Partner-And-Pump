@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "android": {
       "package": "com.anonymous.partnerandpump"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "71fcd87b-2974-4a26-858e-5f858561e662"
+      }
+    },
+    "owner": "johnk35"
   }
 }

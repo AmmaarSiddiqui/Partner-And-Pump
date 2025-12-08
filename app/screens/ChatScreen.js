@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from "react";
+import React, { useLayoutEffect, useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  doc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+
+import { db } from "../services/firebase";
+import { useAuth } from "../state/useAuthContext";
+
 
 // Helper to generate next 7 days
 const getNext7Days = () => {
@@ -33,62 +48,65 @@ const getNext7Days = () => {
   return days;
 };
 
-// Helper for time slots
 const TIMES = [
   "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
   "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", 
   "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"
 ];
 
-// Helper for duration slots
 const DURATIONS = [
   "30 min", "45 min", "1 hr", "1.5 hr", "2 hr", "2.5 hr", "3 hr"
 ];
 
-// TODO: BACKEND - Fetch real chat history from the database (e.g., Firestore/Postgres) based on the conversation ID or recipient ID.
-const INITIAL_MESSAGES = [
-  { id: "1", text: "Hey! Ready to hit the gym?", sender: "them", type: "text" },
-  { id: "2", text: "You know it! What time?", sender: "me", type: "text" },
-  { id: "3", text: "How about 6 PM? We can do push day.", sender: "them", type: "text" },
-  { id: "4", text: "Perfect. See you there.", sender: "me", type: "text" },
-  { id: "5", text: "Sounds good!", sender: "them", type: "text" },
-  {
-    id: "6",
-    sender: "them",
-    type: "invite",
-    status: "pending",
-    details: {
-      date: "Tomorrow",
-      time: "06:00 PM",
-      duration: "1.5 hr",
-      location: "Gold's Gym",
-      description: "Leg Day - Heavy Squats",
-    },
-  },
-];
-
 export default function ChatScreen({ route, navigation }) {
-  const { colors } = useTheme();
-  const { recipientName } = route.params;
+  useEffect(() => {
+  if (!user) {
+    setLoading(false);
+    return;
+  }
 
-  // TODO: BACKEND - Replace this local state with data fetched from the backend. Consider using a library like React Query or a real-time listener (Firestore onSnapshot).
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  let finalId = paramMatchId;
+  if (!finalId && recipientId) {
+    finalId = [user.uid, recipientId].sort().join("_");
+  }
+
+  setChatId(finalId);
+
+  if (!finalId) {
+    console.warn("[ChatScreen] No matchId or recipientId provided.");
+    setLoading(false);
+    return;
+  }
+
+  // ... messages listener here ...
+}, [user, paramMatchId, recipientId]);
+
+
+
+  const { colors } = useTheme();
+  const { user, profile } = useAuth();
+  const { recipientName, recipientId, matchId: paramMatchId } = route.params || {};
+
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
-  
-  // Schedule Modal State
+
   const [modalVisible, setModalVisible] = useState(false);
   const [scheduleData, setScheduleData] = useState({
-    date: "", // Now stores the "full" date string
+    date: "",
     time: "",
     duration: "",
     location: "",
     description: "",
   });
+  
+  const [chatId, setChatId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  
 
-  // Generated dates for the picker
-  const datesList = React.useMemo(() => getNext7Days(), []);
+  const datesList = useMemo(() => getNext7Days(), []);
 
-  // Unmatch Handler
+  // Set header title + unmatch button
   const handleUnmatch = () => {
     Alert.alert(
       "Unmatch",
@@ -99,10 +117,7 @@ export default function ChatScreen({ route, navigation }) {
           text: "Unmatch",
           style: "destructive",
           onPress: () => {
-            // TODO: BACKEND - Call the unmatch API endpoint.
-            // 1. Delete the match record from the database.
-            // 2. Remove the chat history (or archive it).
-            // 3. Update the UI to remove this user from the Match/Messages list.
+            // TODO: BACKEND - remove match + chat in Firestore if you want.
             navigation.goBack();
           },
         },
@@ -113,71 +128,154 @@ export default function ChatScreen({ route, navigation }) {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: recipientName,
-      headerRight: () => (
-        <TouchableOpacity onPress={handleUnmatch}>
-          <Text style={styles.unmatchText}>Unmatch</Text>
-        </TouchableOpacity>
-      ),
+      
     });
   }, [navigation, recipientName]);
 
-  const handleSendText = () => {
-    if (!inputText.trim()) return;
+  // Derive chatId and subscribe to Firestore messages
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    // TODO: BACKEND - Integrate with the WebSocket or API.
-    // 1. Send payload: { senderId: 'me', recipientId: recipientId, text: inputText, type: 'text' }
-    // 2. Optimistically update the UI.
-    // 3. Handle any network errors (e.g., show a "failed to send" icon).
+    // Prefer matchId from params, otherwise derive from user + recipient
+    let finalId = paramMatchId;
+    if (!finalId && recipientId) {
+      finalId = [user.uid, recipientId].sort().join("_");
+    }
 
-    const newMessage = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: "me",
+    setChatId(finalId);
+
+    if (!finalId) {
+      console.warn("[ChatScreen] No matchId or recipientId provided.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+
+    const msgsRef = collection(db, "matches", finalId, "messages");
+    const q = query(msgsRef, orderBy("createdAt", "desc")); // newest first; FlatList is inverted
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setMessages(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[ChatScreen] messages listener error:", err);
+        setLoadError(err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, paramMatchId, recipientId]);
+
+  // Send a normal text message
+  const handleSendText = useCallback(async () => {
+  const trimmed = inputText.trim();
+  if (!trimmed || !user || !chatId) return;
+
+  // ✅ Clear the UI right away
+  setInputText("");
+
+  try {
+    const msgsRef = collection(db, "matches", chatId, "messages");
+
+    await addDoc(msgsRef, {
+      text: trimmed,
+      senderId: user.uid,
+      senderName: profile?.name || "You",
       type: "text",
-    };
-    setMessages((prev) => [newMessage, ...prev]);
-    setInputText("");
-  };
+      createdAt: serverTimestamp(),
+    });
 
-  const handleSendInvite = () => {
+    const matchRef = doc(db, "matches", chatId);
+    await setDoc(
+      matchRef,
+      {
+        lastMessageText: trimmed,
+        lastMessageAt: serverTimestamp(),
+        userIds: [user.uid, recipientId],
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn("[ChatScreen] handleSendText error:", err);
+    // Optional: if you want to put the text back on error:
+    // setInputText(trimmed);
+  }
+}, [inputText, user, chatId, profile, recipientId]);
+
+
+  // Send a workout invite message
+  const handleSendInvite = useCallback(async () => {
     if (!scheduleData.date || !scheduleData.time || !scheduleData.duration || !scheduleData.location) {
       Alert.alert("Missing Info", "Please select Date, Time, Duration, and Location.");
       return;
     }
 
-    // TODO: BACKEND - Create a new "Workout Session" record in the database.
-    // 1. POST to /api/workouts/invite with scheduleData.
-    // 2. Insert a message into the chat that references this new Workout ID.
-    // 3. Trigger a push notification to the recipient.
+    if (!user || !chatId) return;
 
-    const newMessage = {
-      id: Date.now().toString(),
-      sender: "me",
-      type: "invite",
-      status: "pending",
-      details: { ...scheduleData },
-    };
+    try {
+      const msgsRef = collection(db, "matches", chatId, "messages");
 
-    setMessages((prev) => [newMessage, ...prev]);
-    setModalVisible(false);
-    setScheduleData({ date: "", time: "", duration: "", location: "", description: "" });
-  };
+      const details = { ...scheduleData };
 
-  const handleRespondToInvite = (id, response) => {
-    // TODO: BACKEND - Update the status of the invitation.
-    // 1. PUT/PATCH to /api/workouts/{id}/respond with { status: response }.
-    // 2. Notify the original sender that their invite was accepted/declined.
-    // 3. If accepted, add this event to both users' calendars/schedules.
+      await addDoc(msgsRef, {
+        senderId: user.uid,
+        senderName: profile?.name || "You",
+        type: "invite",
+        status: "pending",
+        details,
+        createdAt: serverTimestamp(),
+      });
 
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === id ? { ...msg, status: response } : msg
-      )
-    );
-  };
+      const matchRef = doc(db, "matches", chatId);
+      await updateDoc(matchRef, {
+        lastMessageText: `Workout invite: ${details.date} at ${details.time}`,
+        lastMessageAt: serverTimestamp(),
+      });
+
+      setModalVisible(false);
+      setScheduleData({ date: "", time: "", duration: "", location: "", description: "" });
+    } catch (err) {
+      console.warn("[ChatScreen] handleSendInvite error:", err);
+    }
+  }, [scheduleData, user, chatId, profile]);
+
+  // Accept/decline invite (updates Firestore)
+  const handleRespondToInvite = useCallback(
+    async (id, response) => {
+      if (!chatId) return;
+
+      try {
+        const msgRef = doc(db, "matches", chatId, "messages", id);
+        await updateDoc(msgRef, { status: response });
+
+        // Optimistic local update
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === id ? { ...msg, status: response } : msg
+          )
+        );
+      } catch (err) {
+        console.warn("[ChatScreen] handleRespondToInvite error:", err);
+      }
+    },
+    [chatId]
+  );
 
   const renderMessage = ({ item }) => {
-    const isMe = item.sender === "me";
+    const isMe = item.senderId === user?.uid || item.sender === "me"; // keep compatibility with old mock type
     const bubbleStyle = isMe
       ? [styles.myMessage, { backgroundColor: colors.primary }]
       : [styles.theirMessage, { backgroundColor: colors.card }];
@@ -194,13 +292,19 @@ export default function ChatScreen({ route, navigation }) {
           
           <View style={styles.inviteDetails}>
             <Text style={[styles.inviteText, { color: isMe ? "#eee" : "gray" }]}>
-              📅 {item.details.date} at {item.details.time} {item.details.duration ? `(${item.details.duration})` : ''}
+              📅 {item.details?.date} at {item.details?.time}{" "}
+              {item.details?.duration ? `(${item.details.duration})` : ""}
             </Text>
             <Text style={[styles.inviteText, { color: isMe ? "#eee" : "gray" }]}>
-              📍 {item.details.location}
+              📍 {item.details?.location}
             </Text>
-            {item.details.description ? (
-              <Text style={[styles.inviteText, { color: isMe ? "#eee" : "gray", marginTop: 4, fontStyle: 'italic' }]}>
+            {item.details?.description ? (
+              <Text
+                style={[
+                  styles.inviteText,
+                  { color: isMe ? "#eee" : "gray", marginTop: 4, fontStyle: "italic" },
+                ]}
+              >
                 📝 "{item.details.description}"
               </Text>
             ) : null}
@@ -214,13 +318,13 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
               ) : (
                 <View style={styles.actionRow}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.actionBtn, styles.declineBtn]}
                     onPress={() => handleRespondToInvite(item.id, "declined")}
                   >
                     <Text style={styles.actionBtnText}>Decline</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.actionBtn, styles.acceptBtn]}
                     onPress={() => handleRespondToInvite(item.id, "accepted")}
                   >
@@ -229,10 +333,12 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
               )
             ) : (
-              <View style={[
-                styles.statusBadge, 
-                item.status === "accepted" ? styles.statusAccepted : styles.statusDeclined
-              ]}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  item.status === "accepted" ? styles.statusAccepted : styles.statusDeclined,
+                ]}
+              >
                 <Text style={styles.statusText}>
                   {item.status === "accepted" ? "✅ Accepted" : "❌ Declined"}
                 </Text>
@@ -252,8 +358,42 @@ export default function ChatScreen({ route, navigation }) {
     );
   };
 
+  if (!user) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Text style={{ color: colors.text, textAlign: "center" }}>
+            You must be signed in to chat.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Text style={{ color: colors.text }}>Loading chat...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Text style={{ color: "red", textAlign: "center" }}>
+            Could not load messages: {loadError.message}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -264,12 +404,12 @@ export default function ChatScreen({ route, navigation }) {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          inverted
+          inverted // because we're ordering desc
         />
 
         <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
-          <TouchableOpacity 
-            style={styles.iconButton} 
+          <TouchableOpacity
+            style={styles.iconButton}
             onPress={() => setModalVisible(true)}
           >
             <Ionicons name="calendar-outline" size={28} color={colors.primary} />
@@ -282,7 +422,7 @@ export default function ChatScreen({ route, navigation }) {
             value={inputText}
             onChangeText={setInputText}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.sendButton, { backgroundColor: colors.primary }]}
             onPress={handleSendText}
           >
@@ -290,40 +430,43 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* --- Schedule Modal Updated --- */}
+        {/* Schedule Modal */}
         <Modal
           animationType="slide"
           transparent={true}
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
         >
-          {/* KeyboardAvoidingView inside Modal */}
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Schedule Workout</Text>
-              
-              {/* Use ScrollView for content inside modal to prevent keyboard overlap */}
+
               <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={false}>
-                
                 {/* Date Selector */}
                 <Text style={[styles.label, { color: colors.text }]}>Date</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.selectorScroll}
+                >
                   {datesList.map((d) => {
                     const isSelected = scheduleData.date === d.full;
                     return (
                       <TouchableOpacity
                         key={d.full}
                         style={[
-                          styles.dateChip, 
-                          { backgroundColor: isSelected ? colors.primary : "#333" }
+                          styles.dateChip,
+                          { backgroundColor: isSelected ? colors.primary : "#333" },
                         ]}
-                        onPress={() => setScheduleData({...scheduleData, date: d.full})}
+                        onPress={() => setScheduleData({ ...scheduleData, date: d.full })}
                       >
                         <Text style={{ color: "white", fontSize: 12 }}>{d.dayName}</Text>
-                        <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>{d.dayNum}</Text>
+                        <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
+                          {d.dayNum}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -331,19 +474,25 @@ export default function ChatScreen({ route, navigation }) {
 
                 {/* Time Selector */}
                 <Text style={[styles.label, { color: colors.text }]}>Time</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.selectorScroll}
+                >
                   {TIMES.map((t) => {
                     const isSelected = scheduleData.time === t;
                     return (
                       <TouchableOpacity
                         key={t}
                         style={[
-                          styles.timeChip, 
-                          { backgroundColor: isSelected ? colors.primary : "#333" }
+                          styles.timeChip,
+                          { backgroundColor: isSelected ? colors.primary : "#333" },
                         ]}
-                        onPress={() => setScheduleData({...scheduleData, time: t})}
+                        onPress={() => setScheduleData({ ...scheduleData, time: t })}
                       >
-                        <Text style={{ color: "white", fontSize: 14, fontWeight: "500" }}>{t}</Text>
+                        <Text style={{ color: "white", fontSize: 14, fontWeight: "500" }}>
+                          {t}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -351,19 +500,25 @@ export default function ChatScreen({ route, navigation }) {
 
                 {/* Duration Selector */}
                 <Text style={[styles.label, { color: colors.text }]}>Duration</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.selectorScroll}
+                >
                   {DURATIONS.map((d) => {
                     const isSelected = scheduleData.duration === d;
                     return (
                       <TouchableOpacity
                         key={d}
                         style={[
-                          styles.timeChip, 
-                          { backgroundColor: isSelected ? colors.primary : "#333" }
+                          styles.timeChip,
+                          { backgroundColor: isSelected ? colors.primary : "#333" },
                         ]}
-                        onPress={() => setScheduleData({...scheduleData, duration: d})}
+                        onPress={() => setScheduleData({ ...scheduleData, duration: d })}
                       >
-                        <Text style={{ color: "white", fontSize: 14, fontWeight: "500" }}>{d}</Text>
+                        <Text style={{ color: "white", fontSize: 14, fontWeight: "500" }}>
+                          {d}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -371,33 +526,37 @@ export default function ChatScreen({ route, navigation }) {
 
                 {/* Location Input */}
                 <Text style={[styles.label, { color: colors.text }]}>Location</Text>
-                <TextInput 
+                <TextInput
                   style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
                   placeholder="e.g., Gold's Gym"
                   placeholderTextColor="gray"
                   value={scheduleData.location}
-                  onChangeText={(t) => setScheduleData({...scheduleData, location: t})}
+                  onChangeText={(t) =>
+                    setScheduleData({ ...scheduleData, location: t })
+                  }
                 />
 
                 {/* Description Input */}
                 <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
-                <TextInput 
+                <TextInput
                   style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
                   placeholder="e.g., Chest & Back"
                   placeholderTextColor="gray"
                   value={scheduleData.description}
-                  onChangeText={(t) => setScheduleData({...scheduleData, description: t})}
+                  onChangeText={(t) =>
+                    setScheduleData({ ...scheduleData, description: t })
+                  }
                 />
               </ScrollView>
 
               <View style={styles.modalButtons}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.modalBtn, { backgroundColor: "#333" }]}
                   onPress={() => setModalVisible(false)}
                 >
                   <Text style={{ color: "white" }}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.modalBtn, { backgroundColor: colors.primary }]}
                   onPress={handleSendInvite}
                 >
@@ -407,7 +566,6 @@ export default function ChatScreen({ route, navigation }) {
             </View>
           </KeyboardAvoidingView>
         </Modal>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -439,21 +597,20 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
   },
-  
-  // Invite Styles
+
   inviteBubble: {
     minWidth: 220,
   },
   inviteHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
+    borderBottomColor: "rgba(255,255,255,0.2)",
   },
   inviteTitle: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 8,
     fontSize: 16,
   },
@@ -468,46 +625,45 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statusBadge: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: "rgba(0,0,0,0.2)",
     padding: 6,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statusAccepted: {
-    backgroundColor: 'rgba(50, 205, 50, 0.3)',
+    backgroundColor: "rgba(50, 205, 50, 0.3)",
   },
   statusDeclined: {
-    backgroundColor: 'rgba(255, 0, 0, 0.3)',
+    backgroundColor: "rgba(255, 0, 0, 0.3)",
   },
   statusText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 12,
   },
   actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   actionBtn: {
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 4,
   },
   acceptBtn: {
-    backgroundColor: '#34C759',
+    backgroundColor: "#34C759",
   },
   declineBtn: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: "#FF3B30",
   },
   actionBtnText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 13,
   },
 
-  // Input Styles
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -532,11 +688,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -552,7 +707,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 16, // Reduced bottom margin
+    marginBottom: 16,
     textAlign: "center",
   },
   label: {
@@ -580,25 +735,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 6,
   },
-  // New Selector Styles
   selectorScroll: {
     marginBottom: 16,
-    maxHeight: 60, // Constraint height
+    maxHeight: 60,
   },
   dateChip: {
     width: 60,
     height: 55,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 8,
   },
   timeChip: {
     paddingHorizontal: 14,
     height: 45,
     borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 8,
   },
 });

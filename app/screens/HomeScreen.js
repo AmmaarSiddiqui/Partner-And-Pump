@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,15 @@ import {
   ScrollView,
   FlatList,
 } from "react-native";
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, getDoc, setDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../state/useAuthContext";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useMatches } from "../state/useMatchesContext";
+import { db, auth } from "../services/firebase";
 
-// TODO: BACKEND - Fetch "New Matches" notifications from the database (e.g., /api/notifications/matches).
-// This should return a list of users who have matched with the current user but haven't been chatted with yet.
-const MOCK_MATCH_NOTIFICATIONS = [
-  { id: "1", name: "Jessica Wu", goal: "Hypertrophy", time: "20m ago" },
-  { id: "2", name: "David Chen", goal: "Strength", time: "2h ago" },
-];
+
+
 
 // TODO: BACKEND - Fetch the user's schedule for the current day from the database (e.g., /api/schedule/today).
 // This might include planned workouts, meal times, or sessions scheduled via the ChatScreen.
@@ -32,8 +29,9 @@ const MOCK_SCHEDULE = [
 export default function HomeScreen({ navigation }) {
   const { profile } = useAuth();
   const { colors } = useTheme();
-const { matches, acceptMatch } = useMatches();
+  const { matches, acceptMatch, declineMatch } = useMatches();
   const notifications = matches;
+
 
 
   // TODO: BACKEND - Initialize this state with data fetched from the API.
@@ -45,35 +43,97 @@ const { matches, acceptMatch } = useMatches();
     month: "short",
     day: "numeric",
   });
-
-  const handleMatch = async (item) => {
-  await acceptMatch(item.requestId);
-
-  navigation.navigate("Chat", {
-    recipientName: item.name,
-    recipientId: item.id,
-  });
-};
   
-  const renderMatchNotification = ({ item }) => (
-    <View style={[styles.notificationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+
+const handleMatch = async (item) => {
+  try {
+    const myId = auth.currentUser?.uid;
+    if (!myId) return;
+
+    // 1) Accept in backend (creates match doc)
+    await acceptMatch(item.requestId);
+
+    // 2) Build the same matchId ChatScreen expects
+    const otherId = item.id;
+    const matchId = [myId, otherId].sort().join("_");
+
+    // 3) Go to chat
+    navigation.navigate("Chat", {
+      recipientName: item.name,
+      recipientId: otherId,
+      matchId,
+    });
+  } catch (err) {
+    console.log("❌ handleMatch FAILED:", err);
+  }
+};
+
+const handleDeclineMatch = async (item) => {
+  try {
+    await declineMatch(item.requestId);
+  } catch (err) {
+    console.log("⚠️ handleDeclineMatch FAILED:", err);
+  }
+};
+
+
+
+
+ const renderMatchNotification = ({ item }) => {
+  const isLongTerm = item.mode === "longTerm";
+  const typeLabel = isLongTerm ? "Long-Term" : "Pump Now";
+  const detailLabel = isLongTerm
+    ? `: ${item.category}`
+    : `: ${item.category}`;
+
+  return (
+    <View
+      style={[
+        styles.notificationCard,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.notificationInfo}>
         <View style={styles.avatarPlaceholder}>
           <Text style={styles.avatarText}>{item.name[0]}</Text>
         </View>
         <View>
-          <Text style={[styles.matchName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={styles.matchDetail}>{item.goal} • {item.time}</Text>
+          <Text style={[styles.matchName, { color: colors.text }]}>
+            {item.name}
+          </Text>
+
+          {/* type + detail */}
+          <Text style={styles.matchDetail}>
+            {typeLabel} • {detailLabel}
+          </Text>
+
         </View>
       </View>
-      <TouchableOpacity
-        style={[styles.matchButton, { backgroundColor: colors.primary }]}
-        onPress={() => handleMatch(item)}
-      >
-        <Text style={styles.matchButtonText}>Match</Text>
-      </TouchableOpacity>
+
+      <View style={{ flexDirection: "row" }}>
+        <TouchableOpacity
+          style={[
+            styles.matchButton,
+            { backgroundColor: colors.primary, marginRight: 8 },
+          ]}
+          onPress={() => handleMatch(item)}
+        >
+          <Text style={styles.matchButtonText}>Match</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.declineButton, { backgroundColor: "#FF3B30" }]}
+          onPress={() => handleDeclineMatch(item)}
+        >
+          <Text style={styles.matchButtonText}>Decline</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
+};
+
+
+  
 
   const renderScheduleItem = ({ item }) => (
     <View style={[styles.scheduleItem, { backgroundColor: colors.card }]}>
@@ -116,20 +176,23 @@ const { matches, acceptMatch } = useMatches();
       {notifications.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>New Matches</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              New Matches
+            </Text>
             <View style={[styles.badge, { backgroundColor: colors.primary }]}>
               <Text style={styles.badgeText}>{notifications.length}</Text>
             </View>
           </View>
           <FlatList
             data={notifications}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.requestId}
             renderItem={renderMatchNotification}
-            scrollEnabled={false} // Let the parent ScrollView handle scrolling
+            scrollEnabled={false}
             contentContainerStyle={styles.listContent}
           />
         </View>
       )}
+
 
       {/* 3. Calendar / Schedule Section */}
       <View style={styles.section}>
@@ -319,4 +382,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  //decline button
+  declineButton: {
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  borderRadius: 20,
+},
+
 });
