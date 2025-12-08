@@ -92,7 +92,7 @@ npm ci
 cd ..
 ```
 #### Environment Variables
-Make sure to email mas954@uw.edu for environment variables (Currently should not be needed)
+Make sure to email mas954@uw.edu for environment variables. To use them, create an.env file and follow the .env.example formatting using the given environment variables.
 
 2) Build & run the mobile client (Expo)
 #### From repo root
