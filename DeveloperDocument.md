@@ -18,7 +18,9 @@
 git clone https://github.com/AmmaarSiddiqui/Partner-And-Pump
 ```
   3. Navigate into the project directory
-      cd Partner-And-Pump
+```
+cd Partner-And-Pump
+```
 
 # Directory Structure
  ```
@@ -68,7 +70,7 @@ Follow the steps below to build all components locally and verify everything wit
 
 #### Install once
 ```
-npm i -g firebase-tools   # deploy/emulate backend
+npm install expo
 ```
 
 #### Expo CLI is invoked via npx, no global install required
@@ -112,7 +114,7 @@ This will prebuild native projects and open the iOS Simulator.
 ### TypeScript → JavaScript build:
 ```
 cd functions
-npm run build    # transpiles to lib/
+npm run build    
 ```
 
 4) Lint & type-check (optional but recommended)
@@ -121,12 +123,7 @@ npm run build    # transpiles to lib/
 npm run lint
 ```
 
-# Backend TS type-check
-```
-cd functions
-npm run typecheck     # or: npx tsc --noEmit
-cd ..
-```
+# Testing
 
 #### How to run tests: 
 Testing ensures that both the **mobile client (Expo app)** and **Firebase backend** perform correctly and remain stable as new features are introduced.
@@ -134,8 +131,6 @@ Partner & Pump uses **Jest** for automated testing.
 Continuous Integration (CI) is configured through GitHub Actions to automatically run all tests on every push or pull request.
 
 ---
-
-
 
 Jest is used for all test files both frontend and backend which are named `__tests__/`.
 
