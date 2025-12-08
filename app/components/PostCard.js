@@ -10,12 +10,17 @@ import {
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { db } from "../services/firebase";
+import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
+import { useAuth } from "../state/useAuthContext";
+
 // Using a placeholder for images
 const getPlaceholderImage = (seed) =>
   `https://picsum.photos/seed/${seed}/600/800`;
 
 export default function PostCard({ post }) {
   const { colors } = useTheme();
+  const { user, profile } = useAuth();
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes || 0);
@@ -23,34 +28,69 @@ export default function PostCard({ post }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  const handleLikePress = () => {
-    setLiked((prev) => !prev);
-    setLikeCount((prev) => prev + (liked ? -1 : 1));
+  const displayName =
+    profile?.username ||
+    profile?.displayName ||
+    profile?.name ||
+    user?.email ||
+    "You";
+
+  const mainImageSource = post.imageBase64
+    ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
+    : { uri: getPlaceholderImage(post.imageSeed || post.id) };
+
+  const handleLikePress = async () => {
+    if (!user) return;
+
+    const wasLiked = liked;
+    const delta = wasLiked ? -1 : 1;
+
+    // optimistic UI update
+    setLiked(!wasLiked);
+    setLikeCount((prev) => prev + delta);
+
+    try {
+      const postRef = doc(db, "posts", post.id);
+      await updateDoc(postRef, {
+        likes: increment(delta),
+      });
+    } catch (e) {
+      console.error("Error updating likes:", e);
+      // rollback on error
+      setLiked(wasLiked);
+      setLikeCount((prev) => prev - delta);
+    }
   };
 
   const handleToggleComments = () => {
     setShowComments((prev) => !prev);
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     const text = commentText.trim();
-    if (!text) return;
+    if (!text || !user) return;
 
     const newComment = {
       id: `${Date.now()}`,
-      username: "You", // replace with real logged-in username if you have it
+      username: displayName,
       text,
     };
 
+    // optimistic UI
     setComments((prev) => [...prev, newComment]);
     setCommentText("");
+
+    try {
+      const postRef = doc(db, "posts", post.id);
+      await updateDoc(postRef, {
+        comments: arrayUnion(newComment),
+      });
+    } catch (e) {
+      console.error("Error adding comment:", e);
+      // (optional) you could rollback here if you want
+    }
   };
 
-const mainImageSource = post.imageBase64
-  ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
-  : { uri: getPlaceholderImage(post.imageSeed || post.id) };
-  
-  
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
       {/* Post Header (avatar + username only) */}
