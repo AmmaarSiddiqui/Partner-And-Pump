@@ -1,5 +1,8 @@
 import { setGlobalOptions } from "firebase-functions/v2/options";
-import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import {
+  onDocumentCreated,
+  onDocumentUpdated,
+} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import { Expo } from "expo-server-sdk";
 
@@ -8,13 +11,13 @@ import {
   notifyMatchAccepted,
 } from "./messaging/sendNotification";
 
-// Global options for all v2 functions
+// ---- Global options for all v2 functions ----
 setGlobalOptions({
   region: "us-central1",
   maxInstances: 10,
 });
 
-// Initialize Firebase Admin (only once)
+// ---- Initialize Firebase Admin ----
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -72,8 +75,6 @@ async function sendExpoPushToUser(
 
 /**
  * 1) New match request created → notify RECEIVER (toUserId)
- *
- * Trigger: /matchRequests/{requestId} onCreate (v2)
  */
 export const onMatchRequestCreated = onDocumentCreated(
   "matchRequests/{requestId}",
@@ -117,10 +118,10 @@ export const onMatchRequestCreated = onDocumentCreated(
       body
     );
 
-    // 1) Log it via your existing helper (for tests / in-memory)
+    // log helper
     await notifyPartnerRequest(toUserId, { fromName, gym });
 
-    // 2) Send real push to receiver
+    // push
     await sendExpoPushToUser(toUserId, {
       title: "New Match Request 💪",
       body,
@@ -135,8 +136,6 @@ export const onMatchRequestCreated = onDocumentCreated(
 
 /**
  * 2) Match request updated → notify SENDER when status becomes "accepted"
- *
- * Trigger: /matchRequests/{requestId} onUpdate (v2)
  */
 export const onMatchRequestUpdated = onDocumentUpdated(
   "matchRequests/{requestId}",
@@ -159,7 +158,7 @@ export const onMatchRequestUpdated = onDocumentUpdated(
     const mode: string = after.mode || "";
     const category: string = after.category || "";
 
-    // Get receiver's name (the person who accepted)
+    // Get receiver's name (person who accepted)
     let partnerName = "Your match";
     try {
       const receiverProfile = await db.collection("profiles").doc(toUserId).get();
@@ -187,10 +186,8 @@ export const onMatchRequestUpdated = onDocumentUpdated(
       body
     );
 
-    // 1) Log via your helper
     await notifyMatchAccepted(fromUserId, { partnerName });
 
-    // 2) Send real push to sender
     await sendExpoPushToUser(fromUserId, {
       title: "Match Accepted ✅",
       body,
@@ -198,6 +195,82 @@ export const onMatchRequestUpdated = onDocumentUpdated(
         type: "matchRequest:accepted",
         requestId: event.params.requestId,
         toUserId,
+      },
+    });
+  }
+);
+
+/**
+ * 3) New chat message created → notify RECEIVER
+ *
+ * Trigger: /matches/{matchId}/messages/{messageId} onCreate
+ */
+export const onMessageCreated = onDocumentCreated(
+  "matches/{matchId}/messages/{messageId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) {
+      console.log("[onMessageCreated] No event data");
+      return;
+    }
+
+    const matchId = event.params.matchId;
+    const data = snap.data() as any;
+
+    const text: string = data.text || "";
+    const fromUserId: string | undefined = data.fromUserId;
+    const toUserId: string | undefined = data.toUserId;
+    const createdAt =
+      data.createdAt || admin.firestore.FieldValue.serverTimestamp();
+
+    if (!fromUserId || !toUserId) {
+      console.log("[onMessageCreated] Missing fromUserId/toUserId", data);
+      return;
+    }
+
+    if (fromUserId === toUserId) {
+      return; // no self-notifications
+    }
+
+    // update match summary
+    try {
+      const matchRef = db.collection("matches").doc(matchId);
+      await matchRef.set(
+        {
+          lastMessageText: text,
+          lastMessageAt: createdAt,
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn("[onMessageCreated] Failed to update match doc:", e);
+    }
+
+    // get sender name
+    let fromName = "Your gym partner";
+    try {
+      const senderProfile = await db
+        .collection("profiles")
+        .doc(fromUserId)
+        .get();
+      if (senderProfile.exists) {
+        const p = senderProfile.data() || {};
+        fromName = ((p as any).name as string) || fromName;
+      }
+    } catch (e) {
+      console.warn("[onMessageCreated] Failed to load sender profile:", e);
+    }
+
+    const preview = text.length > 60 ? text.slice(0, 57) + "..." : text;
+
+    await sendExpoPushToUser(toUserId, {
+      title: `${fromName} sent you a message 💬`,
+      body: preview || "New message in Partner & Pump",
+      data: {
+        type: "chat:message",
+        matchId,
+        messageId: event.params.messageId,
+        fromUserId,
       },
     });
   }

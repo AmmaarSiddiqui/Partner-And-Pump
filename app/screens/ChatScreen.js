@@ -31,7 +31,7 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
-  setDoc, // ✅ needed for handleSendText
+  setDoc, 
 } from "firebase/firestore";
 
 import { db } from "../services/firebase";
@@ -178,87 +178,102 @@ export default function ChatScreen({ route, navigation }) {
 
   // Send a normal text message
   const handleSendText = useCallback(async () => {
-    const trimmed = inputText.trim();
-    if (!trimmed || !user || !chatId) return;
+  const trimmed = inputText.trim();
+  if (!trimmed || !user || !chatId) return;
 
-    // Clear UI immediately
-    setInputText("");
+  // Clear UI immediately
+  setInputText("");
 
-    try {
-      const msgsRef = collection(db, "matches", chatId, "messages");
+  try {
+    const msgsRef = collection(db, "matches", chatId, "messages");
 
-      await addDoc(msgsRef, {
-        text: trimmed,
-        senderId: user.uid,
-        senderName: profile?.name || "You",
-        type: "text",
-        createdAt: serverTimestamp(),
-      });
+    const fromUserId = user.uid;
+    const toUserId = recipientId; 
 
-      const matchRef = doc(db, "matches", chatId);
-      await setDoc(
-        matchRef,
-        {
-          lastMessageText: trimmed,
-          lastMessageAt: serverTimestamp(),
-          userIds: [user.uid, recipientId],
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.warn("[ChatScreen] handleSendText error:", err);
-      // optionally: setInputText(trimmed);
-    }
-  }, [inputText, user, chatId, profile, recipientId]);
+    await addDoc(msgsRef, {
+      text: trimmed,                     
+      senderId: fromUserId,
+      senderName: profile?.name || "You",
+      fromUserId,                          
+      toUserId,                            
+      type: "text",
+      createdAt: serverTimestamp(),
+    });
+
+    const matchRef = doc(db, "matches", chatId);
+    await setDoc(
+      matchRef,
+      {
+        lastMessageText: trimmed,
+        lastMessageAt: serverTimestamp(),
+        userIds: [fromUserId, toUserId],
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn("[ChatScreen] handleSendText error:", err);
+    // optionally: setInputText(trimmed);
+  }
+}, [inputText, user, chatId, profile, recipientId]);
+
 
   // Send a workout invite message
   const handleSendInvite = useCallback(async () => {
-    if (
-      !scheduleData.date ||
-      !scheduleData.time ||
-      !scheduleData.duration ||
-      !scheduleData.location
-    ) {
-      Alert.alert(
-        "Missing Info",
-        "Please select Date, Time, Duration, and Location."
-      );
-      return;
-    }
+  if (
+    !scheduleData.date ||
+    !scheduleData.time ||
+    !scheduleData.duration ||
+    !scheduleData.location
+  ) {
+    Alert.alert(
+      "Missing Info",
+      "Please select Date, Time, Duration, and Location."
+    );
+    return;
+  }
 
-    if (!user || !chatId) return;
+  if (!user || !chatId) return;
 
-    try {
-      const msgsRef = collection(db, "matches", chatId, "messages");
-      const details = { ...scheduleData };
+  try {
+    const msgsRef = collection(db, "matches", chatId, "messages");
+    const details = { ...scheduleData };
 
-      await addDoc(msgsRef, {
-        senderId: user.uid,
-        senderName: profile?.name || "You",
-        type: "invite",
-        status: "pending",
-        details,
-        createdAt: serverTimestamp(),
-      });
+    const fromUserId = user.uid;
+    const toUserId = recipientId;
 
-      const matchRef = doc(db, "matches", chatId);
-      await updateDoc(matchRef, {
-        lastMessageText: `Workout invite: ${details.date} at ${details.time}`,
-        lastMessageAt: serverTimestamp(),
-      });
+    const summaryText = `Workout invite: ${details.date} at ${details.time}`;
 
-      setModalVisible(false);
-      setScheduleData({
-        date: "",
-        time: "",
-        duration: "",
-        location: "",
-        description: "",
-      });
-    } catch (err) {
-      console.warn("[ChatScreen] handleSendInvite error:", err);
-    }
-  }, [scheduleData, user, chatId, profile]);
+    await addDoc(msgsRef, {
+      text: summaryText,                    
+      senderId: fromUserId,
+      senderName: profile?.name || "You",
+      fromUserId,                           
+      toUserId,                             
+      type: "invite",
+      status: "pending",
+      details,
+      createdAt: serverTimestamp(),
+    });
+
+    const matchRef = doc(db, "matches", chatId);
+    await updateDoc(matchRef, {
+      lastMessageText: summaryText,
+      lastMessageAt: serverTimestamp(),
+    });
+
+    setModalVisible(false);
+    setScheduleData({
+      date: "",
+      time: "",
+      duration: "",
+      location: "",
+      description: "",
+    });
+  } catch (err) {
+    console.warn("[ChatScreen] handleSendInvite error:", err);
+  }
+}, [scheduleData, user, chatId, profile, recipientId]);
+
 
   // Accept/decline invite
   const handleRespondToInvite = useCallback(

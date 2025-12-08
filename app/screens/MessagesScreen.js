@@ -16,6 +16,8 @@ import {
   where,
   // orderBy,
   onSnapshot,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
 import { db } from "../services/firebase";
@@ -57,66 +59,107 @@ export default function MessagesScreen() {
   const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
-  if (!user) return;
+      if (!user) return;
 
-  setLoading(true);
-  setLoadError(null);
+      setLoading(true);
+      setLoadError(null);
 
-  const q = query(
-    collection(db, "matches"),
-    where("userIds", "array-contains", user.uid)
-  );
+      const q = query(
+        collection(db, "matches"),
+        where("userIds", "array-contains", user.uid)
+      );
 
-  const unsubscribe = onSnapshot(
-    q,
-    (snapshot) => {
-      const items = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        const uid = user.uid;
+      const unsubscribe = onSnapshot(
+        q,
+        async (snapshot) => {
+          try {
+            const uid = user.uid;
 
-        // figure out the other user
-        let otherUserId = null;
-        if (Array.isArray(data.userIds)) {
-          otherUserId = data.userIds.find((id) => id !== uid) || data.userIds[0];
+            // Step 1: base items from matches
+            const baseItems = snapshot.docs.map((docSnap) => {
+              const data = docSnap.data() || {};
+
+              let otherUserId = null;
+              if (Array.isArray(data.userIds)) {
+                otherUserId =
+                  data.userIds.find((id) => id !== uid) ||
+                  data.userIds[0] ||
+                  null;
+              }
+
+              return {
+                id: docSnap.id,
+                matchId: docSnap.id,
+                otherUserId,
+                // temporary, will be replaced after we fetch profiles
+                name: "Gym partner",
+                avatarSeed: otherUserId || docSnap.id,
+                lastMessage: data.lastMessageText || "",
+                lastMessageAt: data.lastMessageAt || null,
+              };
+            });
+
+            // Step 2: fetch profiles for distinct otherUserIds
+            const uniqueOtherIds = Array.from(
+              new Set(
+                baseItems
+                  .map((item) => item.otherUserId)
+                  .filter((id) => !!id)
+              )
+            );
+
+            const profileMap = {};
+            if (uniqueOtherIds.length > 0) {
+              const profileSnaps = await Promise.all(
+                uniqueOtherIds.map((id) => getDoc(doc(db, "profiles", id)))
+              );
+
+              profileSnaps.forEach((snap, index) => {
+                if (snap.exists()) {
+                  profileMap[uniqueOtherIds[index]] = snap.data() || {};
+                }
+              });
+            }
+
+            // Step 3: hydrate items with names / avatarSeeds
+            const items = baseItems.map((item) => {
+              if (!item.otherUserId) return item;
+
+              const p = profileMap[item.otherUserId] || {};
+              const name =
+                p.name ||
+                p.username ||
+                p.displayName ||
+                item.name ||
+                "Gym partner";
+              const avatarSeed =
+                p.avatarSeed || item.avatarSeed || item.otherUserId || item.id;
+
+              return {
+                ...item,
+                name,
+                avatarSeed,
+              };
+            });
+
+            setConversations(items);
+            setLoading(false);
+          } catch (err) {
+            console.warn("[Messages] listener processing error:", err);
+            setLoadError(err);
+            setLoading(false);
+          }
+        },
+        (err) => {
+          console.warn("[Messages] listener error:", err);
+          setLoadError(err);
+          setLoading(false);
         }
+      );
 
-        let otherName = "John Kim";
-        let avatarSeed = docSnap.id;
+      return () => unsubscribe();
+    }, [user]);
 
-        if (data.users && otherUserId && data.users[otherUserId]) {
-          const u = data.users[otherUserId];
-          otherName =
-            u.name ||
-            u.username ||
-            u.displayName ||
-            otherName;
-
-          avatarSeed = u.avatarSeed || otherUserId || docSnap.id;
-        }
-
-        return {
-          id: docSnap.id,
-          matchId: docSnap.id,
-          name: otherName,
-          avatarSeed,
-          otherUserId,
-          lastMessage: data.lastMessageText || "",
-          lastMessageAt: data.lastMessageAt || null,
-        };
-      });
-
-      setConversations(items);
-      setLoading(false);
-    },
-    (err) => {
-      console.warn("[Messages] listener error:", err);
-      setLoadError(err);
-      setLoading(false);
-    }
-  );
-
-  return () => unsubscribe();
-}, [user]);
 
   const onConversationPress = (item) => {
     navigation.navigate("Chat", {
