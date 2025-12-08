@@ -124,17 +124,19 @@ const save = async () => {
       <Label>Workout days</Label>
       <DaysPicker selected={days} onToggle={toggleDay} />
 
-      <Label>Primary gym</Label>
-      {/* ✅ Yasir - Autocomplete instead of plain text */}
-      <PlaceAutocomplete
-      placeholder="LA Fitness - Downtown"
-      initialValue={gym}
-    onSelect={(place) => {
-    // place = { name, address, location: { lat, lng } }
-    console.log("Selected Place:", place)
-    setGym(place.name); // store gym name like before
+     <Label>Primary gym</Label>
+<PlaceAutocomplete
+  placeholder="LA Fitness - Downtown"
+  initialValue={gym}
+  onSelect={(place) => {
+    console.log("Selected Place:", place);
+
+    // Safer fallback — some autocomplete results don't have .name yet
+    const text = place?.name || place?.description || "";
+
+    setGym(text);
   }}
-      />
+/>
 
       <Label>Fitness level</Label>
       <Dropdown

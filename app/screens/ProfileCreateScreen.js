@@ -10,8 +10,16 @@ import {
 } from "react-native";
 import { useAuth } from "../state/useAuthContext";
 import { useTheme } from "@react-navigation/native";
+import PlaceAutocomplete from "../components/PlaceAutocomplete";
 
-const GOAL_OPTIONS = ["Strength", "Aesthetics", "Health", "Weight-loss", "Endurance", "Sports"];
+const GOAL_OPTIONS = [
+  "Strength",
+  "Aesthetics",
+  "Health",
+  "Weight-loss",
+  "Endurance",
+  "Sports",
+];
 
 export default function ProfileCreateScreen() {
   const { setProfile } = useAuth();
@@ -32,7 +40,9 @@ export default function ProfileCreateScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.h1, { color: colors.text }]}>Create your profile</Text>
+      <Text style={[styles.h1, { color: colors.text }]}>
+        Create your profile
+      </Text>
 
       <Text style={[styles.label, { color: colors.text }]}>Name</Text>
       <TextInput
@@ -42,7 +52,11 @@ export default function ProfileCreateScreen() {
         placeholderTextColor="gray"
         style={[
           styles.input,
-          { color: colors.text, backgroundColor: colors.card, borderColor: colors.border },
+          {
+            color: colors.text,
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
         ]}
       />
 
@@ -57,18 +71,19 @@ export default function ProfileCreateScreen() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Primary Gym</Text>
-      <TextInput
-        value={gym}
-        onChangeText={setGym}
-        placeholder="e.g., LA Fitness - Downtown"
-        placeholderTextColor="gray"
-        style={[
-          styles.input,
-          { color: colors.text, backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      />
+<PlaceAutocomplete
+  placeholder="e.g., LA Fitness - Downtown"
+  initialValue={gym}
+  onSelect={(place) => {
+    const text = place?.name || place?.description || "";
+    setGym(text);
+  }}
+/>
 
-      <Button title="Save & Continue" onPress={onSave} />
+
+      <View style={styles.buttonWrapper}>
+        <Button title="Save & Continue" onPress={onSave} />
+      </View>
     </View>
   );
 }
@@ -142,4 +157,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderTopWidth: 1,
   },
+  buttonWrapper: {
+    marginTop: 20,
+  },
 });
+
