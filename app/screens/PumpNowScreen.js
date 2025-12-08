@@ -5,7 +5,6 @@ import { useAuth } from "../state/useAuthContext";
 import MatchCard from "../components/MatchCard";
 // If your service exists, import it; else use a tiny fallback:
 
-// TODO: implement a proper compatibility scoring algorithm
 let compatibilityScore;
 try {
   compatibilityScore = require("../services/matching/compatibilityScore").default;

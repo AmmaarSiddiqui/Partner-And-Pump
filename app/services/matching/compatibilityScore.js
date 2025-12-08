@@ -8,15 +8,15 @@ const SAME_DAY_TIME_WEIGHT = 15;          // 2nd most important
 const SAME_DAY_SCHEDULE_WEIGHT = 15;       // days still matter
 const SAME_DAY_SPLIT_WEIGHT = 10;  // split can be nice to have but isnt as important
 const SAME_DAY_GOAL_WEIGHT = 5;   // goal matters the least
-const SAME_DAY_STRENGTH_CLOSE = 5;        // partial 
+const SAME_DAY_STRENGTH_CLOSE = 5;        // bonus for being close     
 
 // Long-term scoring
 const LONG_TERM_GYM_WEIGHT = 40;          // still dominates
-const LONG_TERM_SCHEDULE_WEIGHT = 10;     // 2nd most important (days overlap)
-const LONG_TERM_SPLIT_WEIGHT = 40;
-const LONG_TERM_GOAL_WEIGHT = 2.5;
+const LONG_TERM_SCHEDULE_WEIGHT = 10;     // 3rd most important (days overlap)
+const LONG_TERM_SPLIT_WEIGHT = 40;        // 2nd most important (want same split for consistency)
+const LONG_TERM_GOAL_WEIGHT = 2.5;      // goal matters but less
 const LONG_TERM_TIME_WEIGHT = 5;         // time important but below schedule
-const LONG_TERM_STRENGTH_CLOSE = 2.5;        // partial 
+const LONG_TERM_STRENGTH_CLOSE = 2.5;     // small bonus
 
 
 // ---- MAX SCORES FOR PERCENT CALC ----

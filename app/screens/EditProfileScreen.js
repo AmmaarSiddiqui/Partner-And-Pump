@@ -7,6 +7,8 @@ import { signOut } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PlaceAutocomplete from "../components/PlaceAutocomplete"; // Yasir: Google Places autocomplete
+
+// Static options for dropdown fields
 const GOAL_OPTIONS = ["Strength", "Aesthetics", "Health", "Weight-loss", "Endurance", "Sports"];
 const TIME_OPTIONS = [
   "Morning (5AM–9AM)",
@@ -22,8 +24,12 @@ export default function EditProfileScreen() {
   const navigation = useNavigation();
   const { profile, setProfile } = useAuth();
 
+ // Controlled form fields, seeded from existing profile
   const [name, setName] = useState(profile?.name || "");
   const [goal, setGoal] = useState(profile?.goal || "strength");
+
+
+  // Gym can be a string or an object with .name from previous versions
   const [gym, setGym] = useState(
     typeof profile?.gym === "string" || !profile?.gym ? (profile?.gym || "") : (profile?.gym?.name || "")
   );
@@ -33,12 +39,15 @@ export default function EditProfileScreen() {
   const [about, setAbout] = useState(profile?.about || "");
   const [fitnessLevel, setFitnessLevel] = useState(profile?.fitnessLevel || "Beginner");
   const [split, setSplit] = useState(profile?.split || "Push/Pull/Legs");
-
+    
+  // Dropdown open/close state
   const [openGoals, setOpenGoals] = useState(false);
   const [openTimes, setOpenTimes] = useState(false);
   const [openFitness, setOpenFitness] = useState(false);
   const [openSplit, setOpenSplit] = useState(false);
 
+
+  // Save state + error 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,24 +55,27 @@ export default function EditProfileScreen() {
     setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
   };
 
-const save = async () => {
-  setError("");
-  const uid = auth.currentUser?.uid;
-  if (!uid) { setError("You must be signed in to save your profile."); return; }
 
-  const toSlug = s => (s||"").trim().toLowerCase();
-  const trim  = s => (s||"").trim();
+  
+  // Save profile to Firestore 
+  const save = async () => {
+    setError("");
+    const uid = auth.currentUser?.uid;
+    if (!uid) { setError("You must be signed in to save your profile."); return; }
 
-  const payload = {
-    name: trim(name),
-    goal: toSlug(goal),
-    gym: trim(gym),
-    time: trim(time),
-    days: Array.isArray(days) ? [...new Set(days)] : [],
-    about: trim(about),
-    fitnessLevel: trim(fitnessLevel),
-    split: trim(split),
-    updatedAt: serverTimestamp(),
+    const toSlug = s => (s||"").trim().toLowerCase();
+    const trim  = s => (s||"").trim();
+
+    const payload = {
+      name: trim(name),
+      goal: toSlug(goal),
+      gym: trim(gym),
+      time: trim(time),
+      days: Array.isArray(days) ? [...new Set(days)] : [],
+      about: trim(about),
+      fitnessLevel: trim(fitnessLevel),
+      split: trim(split),
+      updatedAt: serverTimestamp(),
   };
 
   setSaving(true);
@@ -124,17 +136,19 @@ const save = async () => {
       <Label>Workout days</Label>
       <DaysPicker selected={days} onToggle={toggleDay} />
 
-      <Label>Primary gym</Label>
-      {/* ✅ Yasir - Autocomplete instead of plain text */}
-      <PlaceAutocomplete
-      placeholder="LA Fitness - Downtown"
-      initialValue={gym}
-    onSelect={(place) => {
-    // place = { name, address, location: { lat, lng } }
-    console.log("Selected Place:", place)
-    setGym(place.name); // store gym name like before
+     <Label>Primary gym</Label>
+<PlaceAutocomplete
+  placeholder="LA Fitness - Downtown"
+  initialValue={gym}
+  onSelect={(place) => {
+    console.log("Selected Place:", place);
+
+    // Safer fallback — some autocomplete results don't have .name yet
+    const text = place?.name || place?.description || "";
+
+    setGym(text);
   }}
-      />
+/>
 
       <Label>Fitness level</Label>
       <Dropdown

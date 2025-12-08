@@ -2,10 +2,10 @@ import React from "react";
 import { View, Text, Button, StyleSheet } from "react-native";
 
 export default function MatchCard({
-  name,
-  gym,
-  goal,
-  score,
+  name,         // name
+  gym,          // location
+  goal,         // fitness goals
+  score,        // compatibility score %
   mode,        // "pumpNow" | "longTerm"
   category,    // split or activity
   onSendRequest,

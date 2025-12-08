@@ -18,7 +18,9 @@
 git clone https://github.com/AmmaarSiddiqui/Partner-And-Pump
 ```
   3. Navigate into the project directory
-      cd Partner-And-Pump
+```
+cd Partner-And-Pump
+```
 
 # Directory Structure
  ```
@@ -67,13 +69,18 @@ This project has two build targets:
 Follow the steps below to build all components locally and verify everything with tests.
 
 #### Install once
+    * **Windows users:** Run `npm i -g firebase-tools`
+    * **macOS/Linux users:** You will likely need to use `sudo` to grant permission:
+        ```bash
+        sudo npm i -g firebase-tools
+        ```
 ```
-npm i -g firebase-tools   # deploy/emulate backend
+npm install expo
 ```
 
 #### Expo CLI is invoked via npx, no global install required
 
-1) Clone & install
+1) Clone & install (This should already be done)
 ```
 git clone https://github.com/AmmaarSiddiqui/Partner-And-Pump.git
 cd Partner-And-Pump
@@ -90,7 +97,7 @@ npm ci
 cd ..
 ```
 #### Environment Variables
-Make sure to email mas954@uw.edu for environment variables (Currently should not be needed)
+Make sure to email mas954@uw.edu for environment variables. To use them, create an.env file and follow the .env.example formatting using the given environment variables.
 
 2) Build & run the mobile client (Expo)
 #### From repo root
@@ -112,7 +119,7 @@ This will prebuild native projects and open the iOS Simulator.
 ### TypeScript → JavaScript build:
 ```
 cd functions
-npm run build    # transpiles to lib/
+npm run build    
 ```
 
 4) Lint & type-check (optional but recommended)
@@ -121,12 +128,7 @@ npm run build    # transpiles to lib/
 npm run lint
 ```
 
-# Backend TS type-check
-```
-cd functions
-npm run typecheck     # or: npx tsc --noEmit
-cd ..
-```
+# Testing
 
 #### How to run tests: 
 Testing ensures that both the **mobile client (Expo app)** and **Firebase backend** perform correctly and remain stable as new features are introduced.
@@ -135,8 +137,6 @@ Continuous Integration (CI) is configured through GitHub Actions to automaticall
 
 ---
 
-
-
 Jest is used for all test files both frontend and backend which are named `__tests__/`.
 
 Backend and Frontend Tests (Firebase Functions)
@@ -144,7 +144,6 @@ Backend and Frontend Tests (Firebase Functions)
 ```
 cd functions
 npm install
-Run all Jest tests:
 npm test
 ```
 

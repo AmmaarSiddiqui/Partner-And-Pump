@@ -8,9 +8,11 @@ import {
   Alert,
 } from "react-native";
 import { useTheme, useRoute } from "@react-navigation/native";
-import { db } from "../services/firebase"; // 👈 use your existing firebase.js
+import { db } from "../services/firebase"; //  use your firebase.js
 import { deleteDoc, doc } from "firebase/firestore";
 
+
+// Format a JS Date object into a readable "Mon, Dec 8" style label
 const formatLongDate = (date) =>
   date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -22,10 +24,16 @@ export default function AddScheduleScreen({ navigation }) {
   const { colors } = useTheme();
   const route = useRoute();
 
+  // Callback to save changes (provided by HomeScreen)
   const onSave = route.params?.onSave;
   const existingSchedule = route.params?.existingSchedule; // should include id, title/activity, time, status, dateKey
   const isEditing = !!existingSchedule;
 
+
+  // Determine what date to display:
+  // - use existing item’s date
+  // - or use initial date passed from calendar
+  // - otherwise default to today
   const initialDateParam = existingSchedule?.date
     ? new Date(existingSchedule.date)
     : route.params?.initialDate
@@ -37,6 +45,7 @@ export default function AddScheduleScreen({ navigation }) {
   );
   const [time, setTime] = useState(existingSchedule?.time || "");
 
+  // Save handler — just passes data upward to HomeScreen, which handles Firestore writes
   const handleSave = () => {
     if (!title.trim() || !time.trim()) {
       return;
@@ -63,6 +72,7 @@ export default function AddScheduleScreen({ navigation }) {
     navigation.goBack();
   };
 
+  // Delete schedule item from Firestore (edit mode only)
   const handleDelete = async () => {
     if (!isEditing || !existingSchedule?.id) {
       console.error(

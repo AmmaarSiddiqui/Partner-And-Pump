@@ -87,7 +87,7 @@ const handleLogout = async () => {
     const otherUserId = users.find((u) => u !== uid) || null;
 
     let otherName = "Gym partner";
-    let otherPreferredTime = "";   // 👈 NEW
+    let otherPreferredTime = "";   
 
     try {
       if (otherUserId) {
@@ -95,7 +95,7 @@ const handleLogout = async () => {
         if (profSnap.exists()) {
           const p = profSnap.data();
           if (p.name) otherName = p.name;
-          if (p.time) otherPreferredTime = p.time;   // 👈 from their profile
+          if (p.time) otherPreferredTime = p.time;   // from their profile
         }
       }
     } catch (e) {

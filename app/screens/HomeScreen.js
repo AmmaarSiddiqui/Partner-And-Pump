@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMatches } from "../state/useMatchesContext";
 import { auth } from "../services/firebase";
 
-// 🔥 NEW: import Firestore
+// import Firestore
 import {
   collection,
   query,
@@ -54,7 +54,7 @@ export default function HomeScreen({ navigation }) {
 
   const userId = auth.currentUser?.uid;
 
-  // 🔥 NEW: subscribe to Firestore when date or user changes
+  // subscribe to Firestore when date or user changes
   useEffect(() => {
     if (!userId) {
       setSchedule([]);
@@ -119,7 +119,7 @@ const handleSaveSchedule = async (newItem) => {
       return;
     }
 
-    // 👉 if editing, keep the old dateKey; if creating, use the current selectedDate
+    // if editing, keep the old dateKey; if creating, use the current selectedDate
     const dateKey =
       newItem.dateKey || formatDateKey(selectedDate); // "YYYY-MM-DD"
 
@@ -145,7 +145,7 @@ const handleSaveSchedule = async (newItem) => {
       console.log("[HomeScreen] Created schedule doc:", docRef.id);
     }
   } catch (err) {
-    console.error("❌ handleSaveSchedule FAILED:", err);
+    console.error(" handleSaveSchedule FAILED:", err);
   }
 };
 
@@ -195,11 +195,11 @@ const handleSaveSchedule = async (newItem) => {
     try {
       await declineMatch(item.requestId);
     } catch (err) {
-      console.log("⚠️ handleDeclineMatch FAILED:", err);
+      console.log(" handleDeclineMatch FAILED:", err);
     }
   };
 
-  // 🔥 NEW: open AddSchedule in "edit" mode
+  // open AddSchedule in "edit" mode
   const handleEditSchedule = (item) => {
     navigation.navigate("AddSchedule", {
       // When user hits save, we call handleSaveSchedule with existing id

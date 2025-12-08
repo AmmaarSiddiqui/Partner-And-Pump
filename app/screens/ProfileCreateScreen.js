@@ -9,30 +9,88 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useAuth } from "../state/useAuthContext";
-import { useTheme } from "@react-navigation/native";
+import { useTheme, useNavigation } from "@react-navigation/native";
+import PlaceAutocomplete from "../components/PlaceAutocomplete";
 
-const GOAL_OPTIONS = ["Strength", "Aesthetics", "Health", "Weight-loss", "Endurance", "Sports"];
+// Firestore imports
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../services/firebase"; 
+
+const GOAL_OPTIONS = [
+  "Strength",
+  "Aesthetics",
+  "Health",
+  "Weight-loss",
+  "Endurance",
+  "Sports",
+];
 
 export default function ProfileCreateScreen() {
-  const { setProfile } = useAuth();
+  const { user, setProfile } = useAuth();
   const { colors } = useTheme();
 
+  // Form state
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("Strength");
   const [gym, setGym] = useState("");
   const [goalOpen, setGoalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const navigation = useNavigation();
 
-  const onSave = () => {
+
+  // Create + write profile to Firestore
+  const onSave = async () => {
     if (!name.trim() || !gym.trim()) {
       Alert.alert("Missing info", "Please fill out your name and gym.");
       return;
     }
-    setProfile({ name: name.trim(), goal: goal.trim(), gym: gym.trim() });
+
+    if (!user || !user.uid) {
+      Alert.alert(
+        "Not signed in",
+        "You need to be logged in before creating a profile."
+      );
+      return;
+    }
+
+    // Object to store in Firestore
+    const profile = {
+      uid: user.uid,
+      name: name.trim(),
+      goal: goal.trim(),
+      gym: gym.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    try {
+      setSaving(true);
+      
+      // Save to Firestore (using merge to avoid overriding future fields)
+      const ref = doc(db, "profiles", user.uid);
+      await setDoc(ref, profile, { merge: true });
+
+      setProfile(profile);
+    Alert.alert("Success", "Profile saved!");
+
+
+      
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      Alert.alert(
+        "Error",
+        "We couldn't save your profile right now. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.h1, { color: colors.text }]}>Create your profile</Text>
+      <Text style={[styles.h1, { color: colors.text }]}>
+        Create your profile
+      </Text>
 
       <Text style={[styles.label, { color: colors.text }]}>Name</Text>
       <TextInput
@@ -42,7 +100,11 @@ export default function ProfileCreateScreen() {
         placeholderTextColor="gray"
         style={[
           styles.input,
-          { color: colors.text, backgroundColor: colors.card, borderColor: colors.border },
+          {
+            color: colors.text,
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
         ]}
       />
 
@@ -57,18 +119,22 @@ export default function ProfileCreateScreen() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Primary Gym</Text>
-      <TextInput
-        value={gym}
-        onChangeText={setGym}
+      <PlaceAutocomplete
         placeholder="e.g., LA Fitness - Downtown"
-        placeholderTextColor="gray"
-        style={[
-          styles.input,
-          { color: colors.text, backgroundColor: colors.card, borderColor: colors.border },
-        ]}
+        initialValue={gym}
+        onSelect={(place) => {
+          const text = place?.name || place?.description || "";
+          setGym(text);
+        }}
       />
 
-      <Button title="Save & Continue" onPress={onSave} />
+      <View style={styles.buttonWrapper}>
+        <Button
+          title={saving ? "Saving..." : "Save & Continue"}
+          onPress={onSave}
+          disabled={saving}
+        />
+      </View>
     </View>
   );
 }
@@ -141,5 +207,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderTopWidth: 1,
+  },
+  buttonWrapper: {
+    marginTop: 20,
   },
 });

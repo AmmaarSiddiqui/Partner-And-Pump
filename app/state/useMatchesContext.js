@@ -47,7 +47,7 @@ export function MatchesProvider({ children }) {
     let unsubAuth = null;
     let unsubIncoming = null;
 
-    // 🔐 listen to auth state first
+    //  listen to auth state first
     unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         // logged out → clear + stop listening
@@ -60,7 +60,7 @@ export function MatchesProvider({ children }) {
         return;
       }
 
-      // 👇 DEFINE q *here*
+      //  DEFINE q *here*
       const q = query(
         collection(db, "matchRequests"),
         where("toUserId", "==", user.uid),
@@ -73,7 +73,7 @@ export function MatchesProvider({ children }) {
         unsubIncoming = null;
       }
 
-      // 👇 USE q *here*
+      //  USE q *here*
       unsubIncoming = onSnapshot(q, async (snap) => {
         const rows = await Promise.all(
           snap.docs.map(async (docSnap) => {
@@ -112,7 +112,7 @@ export function MatchesProvider({ children }) {
           })
         );
 
-        // 🔔 detect *new* requests
+        //  detect *new* requests
         const prevIds = prevRequestIdsRef.current;
         const newOnes = rows.filter((r) => !prevIds.has(r.requestId));
 
