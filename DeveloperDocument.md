@@ -69,13 +69,18 @@ This project has two build targets:
 Follow the steps below to build all components locally and verify everything with tests.
 
 #### Install once
+    * **Windows users:** Run `npm i -g firebase-tools`
+    * **macOS/Linux users:** You will likely need to use `sudo` to grant permission:
+        ```bash
+        sudo npm i -g firebase-tools
+        ```
 ```
 npm install expo
 ```
 
 #### Expo CLI is invoked via npx, no global install required
 
-1) Clone & install
+1) Clone & install (This should already be done)
 ```
 git clone https://github.com/AmmaarSiddiqui/Partner-And-Pump.git
 cd Partner-And-Pump
