@@ -144,7 +144,6 @@ Backend and Frontend Tests (Firebase Functions)
 ```
 cd functions
 npm install
-Run all Jest tests:
 npm test
 ```
 
