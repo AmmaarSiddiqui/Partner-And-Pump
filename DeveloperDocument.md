@@ -69,14 +69,13 @@ This project has two build targets:
 Follow the steps below to build all components locally and verify everything with tests.
 
 #### Install once
-    * **Windows users:** Run `npm i -g firebase-tools`
-    * **macOS/Linux users:** You will likely need to use `sudo` to grant permission:
+* Windows users: Run 
+    ```npm i -g firebase-tools```
+* macOS/Linux users: You will likely need to use `sudo` to grant permission:
         ```bash
         sudo npm i -g firebase-tools
         ```
-```
-npm install 
-```
+* Also do this step: ``` npm install ```
 
 #### Expo CLI is invoked via npx, no global install required
 
