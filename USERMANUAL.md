@@ -150,6 +150,7 @@ You can send and receive direct messages within the app. A new chat thread is au
 * A user accepts your **same-day "Pump Now" request**.
 * A user accepts your **long-term partnership request**.
 * You choose to message someone from their **Discover feed post or profile**.
+* You can message someone a scheduled event and if they accept, both users schedules will get updated**.
 
 All your active conversations are saved in the "**Messages**" tab. You can enable browser notifications in your settings to be alerted to new messages.
 
