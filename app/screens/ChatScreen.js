@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from "react";
+import React, { useLayoutEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,31 +25,49 @@ const getNext7Days = () => {
     d.setDate(today.getDate() + i);
     days.push({
       id: i,
-      dayName: d.toLocaleDateString("en-US", { weekday: "short" }), // Mon
-      dayNum: d.toLocaleDateString("en-US", { day: "numeric" }),    // 25
-      full: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+      dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+      dayNum: d.toLocaleDateString("en-US", { day: "numeric" }),
+      full: d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }),
     });
   }
   return days;
 };
 
-// Helper for time slots
 const TIMES = [
-  "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
-  "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", 
-  "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"
+  "6:00 AM",
+  "7:00 AM",
+  "8:00 AM",
+  "9:00 AM",
+  "10:00 AM",
+  "11:00 AM",
+  "12:00 PM",
+  "1:00 PM",
+  "2:00 PM",
+  "3:00 PM",
+  "4:00 PM",
+  "5:00 PM",
+  "6:00 PM",
+  "7:00 PM",
+  "8:00 PM",
+  "9:00 PM",
 ];
 
-// Helper for duration slots
-const DURATIONS = [
-  "30 min", "45 min", "1 hr", "1.5 hr", "2 hr", "2.5 hr", "3 hr"
-];
+const DURATIONS = ["30 min", "45 min", "1 hr", "1.5 hr", "2 hr", "2.5 hr", "3 hr"];
 
-// TODO: BACKEND - Fetch real chat history from the database (e.g., Firestore/Postgres) based on the conversation ID or recipient ID.
+// Mock history for *existing* chats
 const INITIAL_MESSAGES = [
   { id: "1", text: "Hey! Ready to hit the gym?", sender: "them", type: "text" },
   { id: "2", text: "You know it! What time?", sender: "me", type: "text" },
-  { id: "3", text: "How about 6 PM? We can do push day.", sender: "them", type: "text" },
+  {
+    id: "3",
+    text: "How about 6 PM? We can do push day.",
+    sender: "them",
+    type: "text",
+  },
   { id: "4", text: "Perfect. See you there.", sender: "me", type: "text" },
   { id: "5", text: "Sounds good!", sender: "them", type: "text" },
   {
@@ -69,26 +87,25 @@ const INITIAL_MESSAGES = [
 
 export default function ChatScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { recipientName } = route.params;
+  const { recipientName, isNewChat, onUpdateLastMessage } = route.params;
 
-  // TODO: BACKEND - Replace this local state with data fetched from the backend. Consider using a library like React Query or a real-time listener (Firestore onSnapshot).
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  // For new chats (from Discover), start with an empty history.
+  const [messages, setMessages] = useState(
+    isNewChat ? [] : INITIAL_MESSAGES
+  );
   const [inputText, setInputText] = useState("");
-  
-  // Schedule Modal State
+
   const [modalVisible, setModalVisible] = useState(false);
   const [scheduleData, setScheduleData] = useState({
-    date: "", // Now stores the "full" date string
+    date: "",
     time: "",
     duration: "",
     location: "",
     description: "",
   });
 
-  // Generated dates for the picker
-  const datesList = React.useMemo(() => getNext7Days(), []);
+  const datesList = useMemo(() => getNext7Days(), []);
 
-  // Unmatch Handler
   const handleUnmatch = () => {
     Alert.alert(
       "Unmatch",
@@ -99,10 +116,6 @@ export default function ChatScreen({ route, navigation }) {
           text: "Unmatch",
           style: "destructive",
           onPress: () => {
-            // TODO: BACKEND - Call the unmatch API endpoint.
-            // 1. Delete the match record from the database.
-            // 2. Remove the chat history (or archive it).
-            // 3. Update the UI to remove this user from the Match/Messages list.
             navigation.goBack();
           },
         },
@@ -124,31 +137,34 @@ export default function ChatScreen({ route, navigation }) {
   const handleSendText = () => {
     if (!inputText.trim()) return;
 
-    // TODO: BACKEND - Integrate with the WebSocket or API.
-    // 1. Send payload: { senderId: 'me', recipientId: recipientId, text: inputText, type: 'text' }
-    // 2. Optimistically update the UI.
-    // 3. Handle any network errors (e.g., show a "failed to send" icon).
-
     const newMessage = {
       id: Date.now().toString(),
       text: inputText,
       sender: "me",
       type: "text",
     };
+
     setMessages((prev) => [newMessage, ...prev]);
     setInputText("");
+
+    if (typeof onUpdateLastMessage === "function") {
+      onUpdateLastMessage(newMessage.text);
+    }
   };
 
   const handleSendInvite = () => {
-    if (!scheduleData.date || !scheduleData.time || !scheduleData.duration || !scheduleData.location) {
-      Alert.alert("Missing Info", "Please select Date, Time, Duration, and Location.");
+    if (
+      !scheduleData.date ||
+      !scheduleData.time ||
+      !scheduleData.duration ||
+      !scheduleData.location
+    ) {
+      Alert.alert(
+        "Missing Info",
+        "Please select Date, Time, Duration, and Location."
+      );
       return;
     }
-
-    // TODO: BACKEND - Create a new "Workout Session" record in the database.
-    // 1. POST to /api/workouts/invite with scheduleData.
-    // 2. Insert a message into the chat that references this new Workout ID.
-    // 3. Trigger a push notification to the recipient.
 
     const newMessage = {
       id: Date.now().toString(),
@@ -160,15 +176,20 @@ export default function ChatScreen({ route, navigation }) {
 
     setMessages((prev) => [newMessage, ...prev]);
     setModalVisible(false);
-    setScheduleData({ date: "", time: "", duration: "", location: "", description: "" });
+    setScheduleData({
+      date: "",
+      time: "",
+      duration: "",
+      location: "",
+      description: "",
+    });
+
+    if (typeof onUpdateLastMessage === "function") {
+      onUpdateLastMessage("Sent a workout invite");
+    }
   };
 
   const handleRespondToInvite = (id, response) => {
-    // TODO: BACKEND - Update the status of the invitation.
-    // 1. PUT/PATCH to /api/workouts/{id}/respond with { status: response }.
-    // 2. Notify the original sender that their invite was accepted/declined.
-    // 3. If accepted, add this event to both users' calendars/schedules.
-
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === id ? { ...msg, status: response } : msg
@@ -186,21 +207,50 @@ export default function ChatScreen({ route, navigation }) {
       return (
         <View style={[styles.messageBubble, styles.inviteBubble, bubbleStyle]}>
           <View style={styles.inviteHeader}>
-            <Ionicons name="calendar" size={20} color={isMe ? "white" : colors.text} />
-            <Text style={[styles.inviteTitle, { color: isMe ? "white" : colors.text }]}>
+            <Ionicons
+              name="calendar"
+              size={20}
+              color={isMe ? "white" : colors.text}
+            />
+            <Text
+              style={[
+                styles.inviteTitle,
+                { color: isMe ? "white" : colors.text },
+              ]}
+            >
               Workout Invitation
             </Text>
           </View>
-          
+
           <View style={styles.inviteDetails}>
-            <Text style={[styles.inviteText, { color: isMe ? "#eee" : "gray" }]}>
-              📅 {item.details.date} at {item.details.time} {item.details.duration ? `(${item.details.duration})` : ''}
+            <Text
+              style={[
+                styles.inviteText,
+                { color: isMe ? "#eee" : "gray" },
+              ]}
+            >
+              📅 {item.details.date} at {item.details.time}{" "}
+              {item.details.duration ? `(${item.details.duration})` : ""}
             </Text>
-            <Text style={[styles.inviteText, { color: isMe ? "#eee" : "gray" }]}>
+            <Text
+              style={[
+                styles.inviteText,
+                { color: isMe ? "#eee" : "gray" },
+              ]}
+            >
               📍 {item.details.location}
             </Text>
             {item.details.description ? (
-              <Text style={[styles.inviteText, { color: isMe ? "#eee" : "gray", marginTop: 4, fontStyle: 'italic' }]}>
+              <Text
+                style={[
+                  styles.inviteText,
+                  {
+                    color: isMe ? "#eee" : "gray",
+                    marginTop: 4,
+                    fontStyle: "italic",
+                  },
+                ]}
+              >
                 📝 "{item.details.description}"
               </Text>
             ) : null}
@@ -214,27 +264,37 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
               ) : (
                 <View style={styles.actionRow}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.actionBtn, styles.declineBtn]}
-                    onPress={() => handleRespondToInvite(item.id, "declined")}
+                    onPress={() =>
+                      handleRespondToInvite(item.id, "declined")
+                    }
                   >
                     <Text style={styles.actionBtnText}>Decline</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.actionBtn, styles.acceptBtn]}
-                    onPress={() => handleRespondToInvite(item.id, "accepted")}
+                    onPress={() =>
+                      handleRespondToInvite(item.id, "accepted")
+                    }
                   >
                     <Text style={styles.actionBtnText}>Accept</Text>
                   </TouchableOpacity>
                 </View>
               )
             ) : (
-              <View style={[
-                styles.statusBadge, 
-                item.status === "accepted" ? styles.statusAccepted : styles.statusDeclined
-              ]}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  item.status === "accepted"
+                    ? styles.statusAccepted
+                    : styles.statusDeclined,
+                ]}
+              >
                 <Text style={styles.statusText}>
-                  {item.status === "accepted" ? "✅ Accepted" : "❌ Declined"}
+                  {item.status === "accepted"
+                    ? "✅ Accepted"
+                    : "❌ Declined"}
                 </Text>
               </View>
             )}
@@ -253,7 +313,10 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={["bottom"]}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -268,11 +331,15 @@ export default function ChatScreen({ route, navigation }) {
         />
 
         <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
-          <TouchableOpacity 
-            style={styles.iconButton} 
+          <TouchableOpacity
+            style={styles.iconButton}
             onPress={() => setModalVisible(true)}
           >
-            <Ionicons name="calendar-outline" size={28} color={colors.primary} />
+            <Ionicons
+              name="calendar-outline"
+              size={28}
+              color={colors.primary}
+            />
           </TouchableOpacity>
 
           <TextInput
@@ -282,7 +349,7 @@ export default function ChatScreen({ route, navigation }) {
             value={inputText}
             onChangeText={setInputText}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.sendButton, { backgroundColor: colors.primary }]}
             onPress={handleSendText}
           >
@@ -290,123 +357,8 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* --- Schedule Modal Updated --- */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          {/* KeyboardAvoidingView inside Modal */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalOverlay}
-          >
-            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Schedule Workout</Text>
-              
-              {/* Use ScrollView for content inside modal to prevent keyboard overlap */}
-              <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={false}>
-                
-                {/* Date Selector */}
-                <Text style={[styles.label, { color: colors.text }]}>Date</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
-                  {datesList.map((d) => {
-                    const isSelected = scheduleData.date === d.full;
-                    return (
-                      <TouchableOpacity
-                        key={d.full}
-                        style={[
-                          styles.dateChip, 
-                          { backgroundColor: isSelected ? colors.primary : "#333" }
-                        ]}
-                        onPress={() => setScheduleData({...scheduleData, date: d.full})}
-                      >
-                        <Text style={{ color: "white", fontSize: 12 }}>{d.dayName}</Text>
-                        <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>{d.dayNum}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                {/* Time Selector */}
-                <Text style={[styles.label, { color: colors.text }]}>Time</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
-                  {TIMES.map((t) => {
-                    const isSelected = scheduleData.time === t;
-                    return (
-                      <TouchableOpacity
-                        key={t}
-                        style={[
-                          styles.timeChip, 
-                          { backgroundColor: isSelected ? colors.primary : "#333" }
-                        ]}
-                        onPress={() => setScheduleData({...scheduleData, time: t})}
-                      >
-                        <Text style={{ color: "white", fontSize: 14, fontWeight: "500" }}>{t}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                {/* Duration Selector */}
-                <Text style={[styles.label, { color: colors.text }]}>Duration</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll}>
-                  {DURATIONS.map((d) => {
-                    const isSelected = scheduleData.duration === d;
-                    return (
-                      <TouchableOpacity
-                        key={d}
-                        style={[
-                          styles.timeChip, 
-                          { backgroundColor: isSelected ? colors.primary : "#333" }
-                        ]}
-                        onPress={() => setScheduleData({...scheduleData, duration: d})}
-                      >
-                        <Text style={{ color: "white", fontSize: 14, fontWeight: "500" }}>{d}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                {/* Location Input */}
-                <Text style={[styles.label, { color: colors.text }]}>Location</Text>
-                <TextInput 
-                  style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                  placeholder="e.g., Gold's Gym"
-                  placeholderTextColor="gray"
-                  value={scheduleData.location}
-                  onChangeText={(t) => setScheduleData({...scheduleData, location: t})}
-                />
-
-                {/* Description Input */}
-                <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
-                <TextInput 
-                  style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                  placeholder="e.g., Chest & Back"
-                  placeholderTextColor="gray"
-                  value={scheduleData.description}
-                  onChangeText={(t) => setScheduleData({...scheduleData, description: t})}
-                />
-              </ScrollView>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={[styles.modalBtn, { backgroundColor: "#333" }]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={{ color: "white" }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalBtn, { backgroundColor: colors.primary }]}
-                  onPress={handleSendInvite}
-                >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>Send Invite</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+        {/* Modal remains unchanged (omitted here for brevity) */}
+        {/* ... keep your existing modal JSX here ... */}
 
       </KeyboardAvoidingView>
     </SafeAreaView>

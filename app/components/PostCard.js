@@ -1,25 +1,64 @@
-import React from "react";
-import { View, Text, StyleSheet, Image } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  TextInput,
+} from "react-native";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
 // Using a placeholder for images
-const getPlaceholderImage = (seed) => `https://picsum.photos/seed/${seed}/600/800`;
+const getPlaceholderImage = (seed) =>
+  `https://picsum.photos/seed/${seed}/600/800`;
 
 export default function PostCard({ post }) {
   const { colors } = useTheme();
 
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(post.likes || 0);
+  const [comments, setComments] = useState(post.comments || []);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+
+  const handleLikePress = () => {
+    setLiked((prev) => !prev);
+    setLikeCount((prev) => prev + (liked ? -1 : 1));
+  };
+
+  const handleToggleComments = () => {
+    setShowComments((prev) => !prev);
+  };
+
+  const handleAddComment = () => {
+    const text = commentText.trim();
+    if (!text) return;
+
+    const newComment = {
+      id: `${Date.now()}`,
+      username: "You", // replace with real logged-in username if you have it
+      text,
+    };
+
+    setComments((prev) => [...prev, newComment]);
+    setCommentText("");
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
-      {/* Post Header */}
+      {/* Post Header (avatar + username only) */}
       <View style={styles.header}>
-        <Image
-          source={{ uri: getPlaceholderImage(post.id) }}
-          style={styles.avatar}
-        />
-        <Text style={[styles.username, { color: colors.text }]}>
-          {post.username}
-        </Text>
+        <View style={styles.headerLeft}>
+          <Image
+            source={{ uri: getPlaceholderImage(post.id) }}
+            style={styles.avatar}
+          />
+          <Text style={[styles.username, { color: colors.text }]}>
+            {post.username}
+          </Text>
+        </View>
       </View>
 
       {/* Post Image */}
@@ -31,26 +70,81 @@ export default function PostCard({ post }) {
       {/* Post Footer (Actions & Caption) */}
       <View style={styles.footer}>
         <View style={styles.actions}>
-          <Ionicons
-            name="chatbubble-outline"
-            size={24}
-            color={colors.text}
-            style={styles.actionIcon}
-          />
-          <Text style={[styles.comments, { color: "gray" }]}>
-            {post.comments} Comments
-          </Text>
-          <Ionicons
-            name="ellipsis-horizontal"
-            size={24}
-            color={colors.text}
-            style={styles.ellipsis}
-          />
+          {/* Like */}
+          <TouchableOpacity
+            onPress={handleLikePress}
+            style={styles.actionButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={liked ? "heart" : "heart-outline"}
+              size={24}
+              color={liked ? "red" : colors.text}
+              style={styles.actionIcon}
+            />
+            <Text style={[styles.likesText, { color: colors.text }]}>
+              {likeCount}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Comments */}
+          <TouchableOpacity
+            onPress={handleToggleComments}
+            style={styles.actionButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name="chatbubble-outline"
+              size={24}
+              color={colors.text}
+              style={styles.actionIcon}
+            />
+            <Text style={[styles.comments, { color: "gray" }]}>
+              {comments.length} Comments
+            </Text>
+          </TouchableOpacity>
         </View>
+
         <Text style={[styles.caption, { color: colors.text }]}>
           <Text style={{ fontWeight: "bold" }}>{post.username}</Text>{" "}
           {post.caption}
         </Text>
+
+        {/* Comments list + input */}
+        {showComments && (
+          <View style={styles.commentsSection}>
+            {comments.map((c) => (
+              <Text
+                key={c.id}
+                style={[styles.commentText, { color: colors.text }]}
+              >
+                <Text style={styles.commentUsername}>{c.username} </Text>
+                {c.text}
+              </Text>
+            ))}
+
+            <View style={styles.commentInputRow}>
+              <TextInput
+                style={[
+                  styles.commentInput,
+                  { borderColor: colors.border, color: colors.text },
+                ]}
+                placeholder="Add a comment..."
+                placeholderTextColor={colors.border}
+                value={commentText}
+                onChangeText={setCommentText}
+                returnKeyType="send"
+                onSubmitEditing={handleAddComment}
+              />
+              <TouchableOpacity
+                onPress={handleAddComment}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="send" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -59,12 +153,16 @@ export default function PostCard({ post }) {
 const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
-    // Cards in a feed typically don't have borders, but have a background
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
+    justifyContent: "space-between",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   avatar: {
     width: 32,
@@ -77,8 +175,8 @@ const styles = StyleSheet.create({
   },
   image: {
     width: "100%",
-    aspectRatio: 4 / 5, // Common feed image ratio
-    backgroundColor: "#333", // Background while loading
+    aspectRatio: 4 / 5,
+    backgroundColor: "#333",
   },
   footer: {
     padding: 12,
@@ -91,13 +189,43 @@ const styles = StyleSheet.create({
   actionIcon: {
     marginRight: 6,
   },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  likesText: {
+    fontSize: 14,
+  },
   comments: {
     fontSize: 14,
   },
-  ellipsis: {
-    marginLeft: "auto", // Pushes the ellipsis icon to the far right
-  },
   caption: {
     fontSize: 14,
+    marginTop: 4,
+  },
+  commentsSection: {
+    marginTop: 8,
+  },
+  commentText: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  commentUsername: {
+    fontWeight: "600",
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
+    marginRight: 8,
   },
 });
