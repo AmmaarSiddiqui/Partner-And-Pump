@@ -55,7 +55,8 @@ Before starting, ensure you have the following ready:
     ```bash
     npm install
     ```
-4. **Environment variables**
+4. **Environment variables**:
+   
    Email mas954@uw.edu to request the required environment variables.
 
    Once received, create a .env file in the root directory and copy the structure shown in .env.example.  
