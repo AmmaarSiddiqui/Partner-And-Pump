@@ -97,9 +97,12 @@ export default function UploadScreen({ navigation }) {
           user.email ||
           "Unknown",
         caption: trimmedCaption,
-        imageBase64, // store image directly in Firestore
+        imageBase64,
+        likes: 0,          // 🔥 start with 0 likes
+        comments: [],      // 🔥 start with empty comments array
         createdAt: serverTimestamp(),
       });
+      
 
       setUploading(false);
       setImageUri(null);

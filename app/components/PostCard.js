@@ -7,30 +7,20 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { useTheme, useNavigation } from "@react-navigation/native";
+import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { db } from "../services/firebase";
-import {
-  doc,
-  updateDoc,
-  arrayUnion,
-  serverTimestamp,
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-} from "firebase/firestore";
+import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
 import { useAuth } from "../state/useAuthContext";
 
+// Using a placeholder for images
 const getPlaceholderImage = (seed) =>
   `https://picsum.photos/seed/${seed}/600/800`;
 
 export default function PostCard({ post }) {
   const { colors } = useTheme();
-  const navigation = useNavigation();              // useNavigation like MessagesScreen
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes || 0);
@@ -38,85 +28,37 @@ export default function PostCard({ post }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  const postRef = doc(db, "posts", post.id);
+  const displayName =
+    profile?.username ||
+    profile?.displayName ||
+    profile?.name ||
+    user?.email ||
+    "You";
 
- const handleMessagePress = async () => {
-    if (!user) return;
-
-    // figure out who owns the post
-    const ownerId = post.ownerId || post.userId || post.uid;
-    if (!ownerId) {
-      console.log("[PostCard] No ownerId on post, cannot start chat.");
-      return;
-    }
-
-    // don't DM yourself
-    if (ownerId === user.uid) {
-      console.log("[PostCard] Tried to DM yourself, skipping.");
-      return;
-    }
-
-    try {
-      // use same collection as MessagesScreen
-      const matchesRef = collection(db, "matches");
-
-      const pair = [user.uid, ownerId].sort();
-      const pairKey = pair.join("_"); // optional, but nice to store
-
-      // get all matches that include me
-      const q = query(matchesRef, where("userIds", "array-contains", user.uid));
-      const snap = await getDocs(q);
-
-      let chatId = null;
-
-      snap.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        if (Array.isArray(data.userIds) && data.userIds.includes(ownerId)) {
-          chatId = docSnap.id; //  conversation between me + owner
-        }
-      });
-
-      // if no existing match/chat, create one
-      if (!chatId) {
-        const newMatchDoc = await addDoc(matchesRef, {
-          userIds: pair,
-          userPair: pairKey,
-          createdAt: serverTimestamp(),
-          lastMessageAt: null,
-          lastMessageText: "",
-        });
-        chatId = newMatchDoc.id;
-      }
-
-      // navigate to Chat using same params as MessagesScreen
-      navigation.navigate("Chat", {
-        recipientName:  post.username ,
-        matchId: chatId,
-        recipientId: ownerId,
-      });
-    } catch (err) {
-      console.log("Error starting chat from post:", err);
-    }
-  };
-
-
+  const mainImageSource = post.imageBase64
+    ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
+    : { uri: getPlaceholderImage(post.imageSeed || post.id) };
 
   const handleLikePress = async () => {
-    const nextLiked = !liked;
-    const nextCount = likeCount + (nextLiked ? 1 : -1);
+    if (!user) return;
 
-    setLiked(nextLiked);
-    setLikeCount(nextCount);
+    const wasLiked = liked;
+    const delta = wasLiked ? -1 : 1;
+
+    // optimistic UI update
+    setLiked(!wasLiked);
+    setLikeCount((prev) => prev + delta);
 
     try {
+      const postRef = doc(db, "posts", post.id);
       await updateDoc(postRef, {
-        likes: nextCount,
+        likes: increment(delta),
       });
-    } catch (err) {
-      console.log("Error updating likes:", err);
-      // revert on error
-      setLiked(liked);
-      setLikeCount(likeCount);
+    } catch (e) {
+      console.error("Error updating likes:", e);
+      // rollback on error
+      setLiked(wasLiked);
+      setLikeCount((prev) => prev - delta);
     }
   };
 
@@ -126,38 +68,32 @@ export default function PostCard({ post }) {
 
   const handleAddComment = async () => {
     const text = commentText.trim();
-    if (!text) return;
+    if (!text || !user) return;
 
     const newComment = {
       id: `${Date.now()}`,
-      userId: user?.uid || "anon",
-      username: user?.displayName || post.username || "You",
+      username: displayName,
       text,
-      createdAt: new Date().toISOString(),
     };
 
+    // optimistic UI
     setComments((prev) => [...prev, newComment]);
     setCommentText("");
 
     try {
+      const postRef = doc(db, "posts", post.id);
       await updateDoc(postRef, {
-        comments: arrayUnion({
-          ...newComment,
-          createdAt: serverTimestamp(),
-        }),
+        comments: arrayUnion(newComment),
       });
-    } catch (err) {
-      console.log("Error adding comment:", err);
+    } catch (e) {
+      console.error("Error adding comment:", e);
+      // (optional) you could rollback here if you want
     }
   };
 
-  const mainImageSource = post.imageBase64
-    ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
-    : { uri: getPlaceholderImage(post.imageSeed || post.id) };
-
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
-      {/* Header */}
+      {/* Post Header (avatar + username only) */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
@@ -170,10 +106,10 @@ export default function PostCard({ post }) {
         </View>
       </View>
 
-      {/* Image */}
+      {/* Post Image */}
       <Image source={mainImageSource} style={styles.image} />
 
-      {/* Footer */}
+      {/* Post Footer (Actions & Caption) */}
       <View style={styles.footer}>
         <View style={styles.actions}>
           {/* Like */}
@@ -209,14 +145,6 @@ export default function PostCard({ post }) {
               {comments.length} Comments
             </Text>
           </TouchableOpacity>
-
-          {/* Message Owner */}
-          <TouchableOpacity
-            style={styles.messageBtn}
-            onPress={handleMessagePress}
-          >
-            <Text style={styles.messageBtnText}>Message</Text>
-          </TouchableOpacity>
         </View>
 
         <Text style={[styles.caption, { color: colors.text }]}>
@@ -224,7 +152,7 @@ export default function PostCard({ post }) {
           {post.caption}
         </Text>
 
-        {/* Comments */}
+        {/* Comments list + input */}
         {showComments && (
           <View style={styles.commentsSection}>
             {comments.map((c) => (
@@ -263,8 +191,6 @@ export default function PostCard({ post }) {
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   card: {
@@ -343,18 +269,5 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     fontSize: 13,
     marginRight: 8,
-  },
-  messageBtn: {
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    alignSelf: "flex-end",
-  },
-  messageBtnText: {
-    color: "white",
-    fontWeight: "600",
-
   },
 });
