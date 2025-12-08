@@ -54,6 +54,8 @@ Before starting, ensure you have the following ready:
     **Next, install the project's local dependencies:**
     ```bash
     npm install
+    npm ci
+   
     ```
 4. **Environment variables**:
    
