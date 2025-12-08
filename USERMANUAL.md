@@ -102,6 +102,12 @@ If you run `npx expo start -c` and receive an error message containing `npm erro
     ```bash
     npx expo start -c
     ```
+4. Note: If you want to run 2 devices you must login with
+   ```
+   npx expo login
+   ```
+   You can create an account on expo go mobile app.
+   If you are just using one device, just the down arrow to proceed anonymously and hit enter. 
 
 ## 5. How to Use the Software
 
