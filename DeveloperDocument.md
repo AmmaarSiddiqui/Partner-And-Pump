@@ -75,7 +75,7 @@ Follow the steps below to build all components locally and verify everything wit
         sudo npm i -g firebase-tools
         ```
 ```
-npm install expo
+npm install 
 ```
 
 #### Expo CLI is invoked via npx, no global install required
