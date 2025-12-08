@@ -5,3 +5,9 @@ node_modules_backup/
 .DS_Store
 */.DS_Store
 android/
+
+
+
+.env
+.env.*
+!.env.example

@@ -22,49 +22,58 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function App() {
-  // ask for permissions (already had this)
-  // Save Expo push token for logged-in users
-useEffect(() => {
-  const unsub = onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
+  export default function App() {
+    // ask for permissions (already had this)
+    // Save Expo push token for logged-in users
+  useEffect(() => {
+      const unsub = onAuthStateChanged(auth, async (user) => {
+        if (!user) return;
 
-    try {
-      // Ensure permissions
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== "granted") {
-        console.warn("Push permission not granted");
-        return;
-      }
+        try {
+          // 1) Check existing permission
+          let { status } = await Notifications.getPermissionsAsync();
 
-      // Get token (NOW works because projectId is set)
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig.extra.eas.projectId,
+          // 2) If not granted, ASK the user
+          if (status !== "granted") {
+            const req = await Notifications.requestPermissionsAsync();
+            status = req.status;
+          }
+
+          // 3) If still not granted, bail
+          if (status !== "granted") {
+            console.warn("Push permission not granted for user:", user.uid);
+            return;
+          }
+
+          // 4) Get the Expo push token
+          const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: Constants.expoConfig.extra.eas.projectId,
+          });
+
+          const expoPushToken = tokenData.data;
+          console.log("Expo push token:", expoPushToken);
+
+          // 5) Save token to Firestore under profiles/{uid}
+          await setDoc(
+            doc(db, "profiles", user.uid),
+            { expoPushToken },
+            { merge: true }
+          );
+
+          console.log("Saved push token for", user.uid);
+        } catch (e) {
+          console.warn("Error registering push token:", e);
+        }
       });
 
-      const expoPushToken = tokenData.data;
-      console.log("Expo push token:", expoPushToken);
+      return () => unsub();
+    }, []);
 
-      // Save token to Firestore
-      await setDoc(
-        doc(db, "profiles", user.uid),
-        { expoPushToken },
-        { merge: true }
-      );
-    } catch (e) {
-      console.warn("Error registering push token:", e);
-    }
-  });
-
-  return () => unsub();
-}, []);
-
-
-  return (
-    <AuthProvider>
-      <MatchesProvider>
-        <AppNavigator />
-      </MatchesProvider>
-    </AuthProvider>
-  );
-}
+    return (
+      <AuthProvider>
+        <MatchesProvider>
+          <AppNavigator />
+        </MatchesProvider>
+      </AuthProvider>
+    );
+  }

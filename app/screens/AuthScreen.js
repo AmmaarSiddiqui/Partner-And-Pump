@@ -1,9 +1,21 @@
 // app/screens/AuthScreen.js
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, Alert, KeyboardAvoidingView, Platform } from "react-native";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../services/firebase"; // adjust path if needed
+import { auth, db } from "../services/firebase";
 
 export default function AuthScreen() {
   const [mode, setMode] = useState("login"); // "login" | "signup"
@@ -11,6 +23,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const isSignup = mode === "signup";
 
@@ -29,10 +42,16 @@ export default function AuthScreen() {
     }
 
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      setLoading(true);
+
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
       await updateProfile(cred.user, { displayName: name.trim() });
 
-      // optional: create a minimal user doc; DO NOT create 'profiles' here.
       await setDoc(doc(db, "users", cred.user.uid), {
         uid: cred.user.uid,
         name: name.trim(),
@@ -40,25 +59,17 @@ export default function AuthScreen() {
         createdAt: new Date(),
       });
 
-      const profileRef = doc(db, "profiles", cred.user.uid);
-      await setDoc(profileRef, {
-        name: name.trim(),
-        goal: "strength",
-        gym: "",
-        time: "Morning (5AM–9AM)",
-        days: [],
-        about: "",
-        fitnessLevel: "Beginner",
-        split: "Push/Pull/Legs",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }, { merge: true });
+      //  No profile doc here
+      //  No navigation.reset here
+      // onAuthStateChanged in useAuthContext will fire,
+      // AppNavigator will see user + (incomplete) profile
+      // and show ProfileCreateFlow.
 
-
-      // Do NOT navigate here. AuthProvider will detect user and AppNavigator will switch to Boot -> Create/Main.
-      Alert.alert("Success", "Account created! Finishing setup…");
     } catch (e) {
-      Alert.alert("Sign up failed", e.message);
+      console.error("Sign up error:", e);
+      Alert.alert("Sign up failed", e.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,10 +79,14 @@ export default function AuthScreen() {
       return;
     }
     try {
+      setLoading(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      // No manual navigation; provider + navigator will switch branches automatically.
+      // No manual navigation; AppNavigator will handle it.
     } catch (e) {
-      Alert.alert("Login failed", e.message);
+      console.error("Login error:", e);
+      Alert.alert("Login failed", e.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,7 +97,9 @@ export default function AuthScreen() {
     >
       <View style={{ flex: 1, padding: 24, gap: 24 }}>
         <View style={{ alignItems: "center", marginTop: 40 }}>
-          <Text style={{ color: "white", fontSize: 28, fontWeight: "700" }}>Partner & Pump</Text>
+          <Text style={{ color: "white", fontSize: 28, fontWeight: "700" }}>
+            Partner & Pump
+          </Text>
           <Text style={{ color: "#9aa0a6", marginTop: 6 }}>
             {isSignup ? "Create your account" : "Welcome back"}
           </Text>
@@ -100,8 +117,16 @@ export default function AuthScreen() {
             gap: 4,
           }}
         >
-          <TabButton active={isSignup} label="Sign up" onPress={() => setMode("signup")} />
-          <TabButton active={!isSignup} label="Log in" onPress={() => setMode("login")} />
+          <TabButton
+            active={isSignup}
+            label="Sign up"
+            onPress={() => setMode("signup")}
+          />
+          <TabButton
+            active={!isSignup}
+            label="Log in"
+            onPress={() => setMode("login")}
+          />
         </View>
 
         {/* Form */}
@@ -144,8 +169,10 @@ export default function AuthScreen() {
         {/* Submit */}
         <Pressable
           onPress={isSignup ? onSignup : onLogin}
+          disabled={loading}
           style={({ pressed }) => ({
             backgroundColor: pressed ? "#2b5cff" : "#3b6cff",
+            opacity: loading ? 0.7 : 1,
             paddingVertical: 14,
             borderRadius: 12,
             alignItems: "center",
@@ -153,14 +180,25 @@ export default function AuthScreen() {
           })}
         >
           <Text style={{ color: "white", fontWeight: "700" }}>
-            {isSignup ? "Create account" : "Log in"}
+            {loading
+              ? isSignup
+                ? "Creating account..."
+                : "Logging in..."
+              : isSignup
+              ? "Create account"
+              : "Log in"}
           </Text>
         </Pressable>
 
         {/* Switch helper */}
-        <Pressable onPress={() => setMode(isSignup ? "login" : "signup")} style={{ alignSelf: "center", marginTop: 6 }}>
+        <Pressable
+          onPress={() => setMode(isSignup ? "login" : "signup")}
+          style={{ alignSelf: "center", marginTop: 6 }}
+        >
           <Text style={{ color: "#9aa0a6" }}>
-            {isSignup ? "Already have an account? Log in" : "New here? Create an account"}
+            {isSignup
+              ? "Already have an account? Log in"
+              : "New here? Create an account"}
           </Text>
         </Pressable>
       </View>
@@ -180,7 +218,14 @@ function TabButton({ active, label, onPress }) {
         alignItems: "center",
       }}
     >
-      <Text style={{ color: active ? "white" : "#9aa0a6", fontWeight: "600" }}>{label}</Text>
+      <Text
+        style={{
+          color: active ? "white" : "#9aa0a6",
+          fontWeight: "600",
+        }}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

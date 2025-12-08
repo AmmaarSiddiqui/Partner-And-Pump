@@ -2,8 +2,7 @@
 // Helpers for talking to the Google Places API (New).
 
 // HARD-CODE your new Google Places API key
-const GOOGLE_API_KEY = "AIzaSyArWbYT4-bXV3nKv8-WCn9ZRSNgK788DCs";
-
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 /**
  * Get autocomplete suggestions for gyms based on user text.
  *

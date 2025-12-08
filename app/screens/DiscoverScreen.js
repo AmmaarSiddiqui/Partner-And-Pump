@@ -57,7 +57,7 @@ export default function DiscoverScreen({ navigation }) {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) => <PostCard post={item} navigation={navigation} />}
         contentContainerStyle={styles.list}
       />
     </View>

@@ -12,7 +12,7 @@ import { Platform } from "react-native";
 
 console.log("[firebase] init");
 
-// 🔐 All values come from environment variables now
+// All values come from environment variables 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -45,4 +45,4 @@ setLogLevel("error");
 const storage = getStorage(app);
 
 export { app, auth, db, storage, firebaseConfig };//config added
-export { app, auth, db, firebaseConfig };
+

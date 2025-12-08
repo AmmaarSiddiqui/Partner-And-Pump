@@ -9,17 +9,9 @@
  *  - Experience level fit matters
  *  - Same gym / location matters a little
  *
- * We weight factors like this:
- *   scheduleOverlap: 40%
- *   workoutSplit:    30%
- *   goals:           15%
- *   level:           10%
- *   gym:              5%
+ * CURRENTLY OUTDATED 
+ * refer to app/services/matching/compatibilityScore.js for the latest version
  *
- * Output is always clamped 0–100 and rounded to nearest int.
- *
- * NOTE: If the two profiles have the same uid, we throw. You should
- * never be suggested as your own match.
  */
 
 export type UserProfile = {

@@ -39,7 +39,7 @@ export default function UploadScreen({ navigation }) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.4, // keep small for Firestore
-      base64: true, // 🔑 we need base64
+      base64: true, //  we need base64
     });
 
     if (!result.canceled) {
@@ -97,7 +97,7 @@ export default function UploadScreen({ navigation }) {
           user.email ||
           "Unknown",
         caption: trimmedCaption,
-        imageBase64, // 🔑 store image directly in Firestore
+        imageBase64, // store image directly in Firestore
         createdAt: serverTimestamp(),
       });
 

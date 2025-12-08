@@ -9,8 +9,12 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useAuth } from "../state/useAuthContext";
-import { useTheme } from "@react-navigation/native";
+import { useTheme, useNavigation } from "@react-navigation/native";
 import PlaceAutocomplete from "../components/PlaceAutocomplete";
+
+// Firestore imports
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../services/firebase"; 
 
 const GOAL_OPTIONS = [
   "Strength",
@@ -22,20 +26,64 @@ const GOAL_OPTIONS = [
 ];
 
 export default function ProfileCreateScreen() {
-  const { setProfile } = useAuth();
+  const { user, setProfile } = useAuth();
   const { colors } = useTheme();
 
+  // Form state
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("Strength");
   const [gym, setGym] = useState("");
   const [goalOpen, setGoalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const navigation = useNavigation();
 
-  const onSave = () => {
+
+  // Create + write profile to Firestore
+  const onSave = async () => {
     if (!name.trim() || !gym.trim()) {
       Alert.alert("Missing info", "Please fill out your name and gym.");
       return;
     }
-    setProfile({ name: name.trim(), goal: goal.trim(), gym: gym.trim() });
+
+    if (!user || !user.uid) {
+      Alert.alert(
+        "Not signed in",
+        "You need to be logged in before creating a profile."
+      );
+      return;
+    }
+
+    // Object to store in Firestore
+    const profile = {
+      uid: user.uid,
+      name: name.trim(),
+      goal: goal.trim(),
+      gym: gym.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    try {
+      setSaving(true);
+      
+      // Save to Firestore (using merge to avoid overriding future fields)
+      const ref = doc(db, "profiles", user.uid);
+      await setDoc(ref, profile, { merge: true });
+
+      setProfile(profile);
+    Alert.alert("Success", "Profile saved!");
+
+
+      
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      Alert.alert(
+        "Error",
+        "We couldn't save your profile right now. Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -71,18 +119,21 @@ export default function ProfileCreateScreen() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Primary Gym</Text>
-<PlaceAutocomplete
-  placeholder="e.g., LA Fitness - Downtown"
-  initialValue={gym}
-  onSelect={(place) => {
-    const text = place?.name || place?.description || "";
-    setGym(text);
-  }}
-/>
-
+      <PlaceAutocomplete
+        placeholder="e.g., LA Fitness - Downtown"
+        initialValue={gym}
+        onSelect={(place) => {
+          const text = place?.name || place?.description || "";
+          setGym(text);
+        }}
+      />
 
       <View style={styles.buttonWrapper}>
-        <Button title="Save & Continue" onPress={onSave} />
+        <Button
+          title={saving ? "Saving..." : "Save & Continue"}
+          onPress={onSave}
+          disabled={saving}
+        />
       </View>
     </View>
   );
@@ -161,4 +212,3 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
-

@@ -1,5 +1,5 @@
 // app/screens/HomeScreen.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMatches } from "../state/useMatchesContext";
 import { auth } from "../services/firebase";
 
-// --- MOCK SCHEDULE (until you wire real backend) ---
-const MOCK_SCHEDULE = [
-  { id: "1", time: "07:00 AM", activity: "Morning Cardio", status: "completed" },
-  { id: "2", time: "05:30 PM", activity: "Push Day (Chest & Tris)", status: "upcoming" },
-  { id: "3", time: "07:00 PM", activity: "Post-Workout Meal", status: "upcoming" },
-];
+// import Firestore
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "../services/firebase"; // make sure db is exported from firebase.js
 
 // --- date helpers ---
 const formatLongDate = (date) =>
@@ -39,37 +46,109 @@ export default function HomeScreen({ navigation }) {
 
   // ---- SCHEDULE STATE ----
   const [selectedDate, setSelectedDate] = useState(new Date());
-
-  const [scheduleByDate, setScheduleByDate] = useState(() => {
-    const key = formatDateKey(new Date());
-    return { [key]: MOCK_SCHEDULE };
-  });
+  const [schedule, setSchedule] = useState([]); // list for that day
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
 
   const selectedDateKey = formatDateKey(selectedDate);
   const selectedDateLabel = formatLongDate(selectedDate);
-  const schedule = scheduleByDate[selectedDateKey] || [];
+
+  const userId = auth.currentUser?.uid;
+
+  // subscribe to Firestore when date or user changes
+  useEffect(() => {
+    if (!userId) {
+      setSchedule([]);
+      setLoadingSchedule(false);
+      return;
+    }
+
+    setLoadingSchedule(true);
+
+    const q = query(
+      collection(db, "schedules"),
+      where("userId", "==", userId),
+      where("dateKey", "==", selectedDateKey),
+      orderBy("time")
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setSchedule(list);
+        setLoadingSchedule(false);
+      },
+      (err) => {
+        console.log("❌ schedule onSnapshot error:", err);
+        setLoadingSchedule(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [userId, selectedDateKey]);
 
   // ---- SCHEDULE HELPERS ----
 
-  const handleAddSchedule = (newItem) => {
-    setScheduleByDate((prev) => {
-      const date = newItem.date ? new Date(newItem.date) : selectedDate;
-      const key = formatDateKey(date);
-      const existing = prev[key] || [];
+  /**
+   * This is called from AddSchedule screen.
+   * It handles BOTH creating and editing:
+   *  - if newItem.id exists -> update existing doc
+   *  - else -> create new doc
+   *
+   * newItem should look like:
+   *  {
+   *    id?: string,      // only for edit
+   *    title: string,    // activity
+   *    time: string,     // "05:30 PM"
+   *    date?: Date | string, // optional override date
+   *    status?: "upcoming" | "completed"
+   *  }
+   */
+  // HomeScreen.js
 
-      const newEntry = {
-        id: String(existing.length + 1),
-        time: newItem.time,
-        activity: newItem.title,
-        status: "upcoming",
-      };
+const handleSaveSchedule = async (newItem) => {
+  try {
+    console.log("[HomeScreen] handleSaveSchedule called with:", newItem);
 
-      return {
-        ...prev,
-        [key]: [...existing, newEntry],
-      };
-    });
-  };
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      console.warn("[HomeScreen] handleSaveSchedule – no auth.currentUser");
+      return;
+    }
+
+    // if editing, keep the old dateKey; if creating, use the current selectedDate
+    const dateKey =
+      newItem.dateKey || formatDateKey(selectedDate); // "YYYY-MM-DD"
+
+    const payload = {
+      userId: uid,
+      dateKey,
+      time: newItem.time,
+      activity: newItem.title,
+      status: newItem.status || "upcoming",
+    };
+
+    console.log("[HomeScreen] Writing schedule payload:", payload);
+
+    if (newItem.id) {
+      const ref = doc(db, "schedules", newItem.id);
+      await updateDoc(ref, payload);
+      console.log("[HomeScreen] Updated schedule doc:", newItem.id);
+    } else {
+      const docRef = await addDoc(collection(db, "schedules"), {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+      console.log("[HomeScreen] Created schedule doc:", docRef.id);
+    }
+  } catch (err) {
+    console.error(" handleSaveSchedule FAILED:", err);
+  }
+};
+
 
   const goToPreviousDay = () => {
     setSelectedDate((prev) => {
@@ -116,8 +195,29 @@ export default function HomeScreen({ navigation }) {
     try {
       await declineMatch(item.requestId);
     } catch (err) {
-      console.log("⚠️ handleDeclineMatch FAILED:", err);
+      console.log(" handleDeclineMatch FAILED:", err);
     }
+  };
+
+  // open AddSchedule in "edit" mode
+  const handleEditSchedule = (item) => {
+    navigation.navigate("AddSchedule", {
+      // When user hits save, we call handleSaveSchedule with existing id
+      onSave: (updated) =>
+        handleSaveSchedule({
+          ...updated,
+          id: item.id,
+        }),
+      initialDate: selectedDate,
+      // You can use this inside AddSchedule to pre-fill the form
+      existingSchedule: {
+        id: item.id,
+        title: item.activity,
+        time: item.time,
+        date: selectedDate,
+        status: item.status,
+      },
+    });
   };
 
   // ---- RENDERERS ----
@@ -173,34 +273,39 @@ export default function HomeScreen({ navigation }) {
   };
 
   const renderScheduleItem = ({ item }) => (
-    <View style={[styles.scheduleItem, { backgroundColor: colors.card }]}>
-      <View style={styles.timeContainer}>
-        <Text style={[styles.timeText, { color: colors.text }]}>
-          {item.time}
-        </Text>
-        {item.status === "completed" && (
-          <Ionicons
-            name="checkmark-circle"
-            size={16}
-            color={colors.primary}
-            style={{ marginTop: 4 }}
-          />
-        )}
+    <TouchableOpacity
+      onPress={() => handleEditSchedule(item)}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.scheduleItem, { backgroundColor: colors.card }]}>
+        <View style={styles.timeContainer}>
+          <Text style={[styles.timeText, { color: colors.text }]}>
+            {item.time}
+          </Text>
+          {item.status === "completed" && (
+            <Ionicons
+              name="checkmark-circle"
+              size={16}
+              color={colors.primary}
+              style={{ marginTop: 4 }}
+            />
+          )}
+        </View>
+        <View
+          style={[
+            styles.activityContainer,
+            { borderLeftColor: colors.primary },
+          ]}
+        >
+          <Text style={[styles.activityText, { color: colors.text }]}>
+            {item.activity}
+          </Text>
+          <Text style={styles.statusText}>
+            {item.status === "completed" ? "Done" : "Up next"}
+          </Text>
+        </View>
       </View>
-      <View
-        style={[
-          styles.activityContainer,
-          { borderLeftColor: colors.primary },
-        ]}
-      >
-        <Text style={[styles.activityText, { color: colors.text }]}>
-          {item.activity}
-        </Text>
-        <Text style={styles.statusText}>
-          {item.status === "completed" ? "Done" : "Up next"}
-        </Text>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 
   // ---- UI ----
@@ -262,7 +367,7 @@ export default function HomeScreen({ navigation }) {
             ]}
             onPress={() =>
               navigation.navigate("AddSchedule", {
-                onSave: handleAddSchedule,
+                onSave: handleSaveSchedule,
                 initialDate: selectedDate,
               })
             }
@@ -283,11 +388,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.dateArrowButton}
             onPress={goToPreviousDay}
           >
-            <Ionicons
-              name="chevron-back"
-              size={20}
-              color={colors.primary}
-            />
+            <Ionicons name="chevron-back" size={20} color={colors.primary} />
           </TouchableOpacity>
 
           <View style={styles.dateCenter}>
@@ -314,13 +415,23 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <FlatList
-          data={schedule}
-          keyExtractor={(item) => item.id}
-          renderItem={renderScheduleItem}
-          scrollEnabled={false}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        />
+        {loadingSchedule ? (
+          <Text style={{ color: colors.text, opacity: 0.7 }}>
+            Loading schedule...
+          </Text>
+        ) : schedule.length === 0 ? (
+          <Text style={{ color: colors.text, opacity: 0.7 }}>
+            No schedule items for this day yet. Tap "Add" to create one.
+          </Text>
+        ) : (
+          <FlatList
+            data={schedule}
+            keyExtractor={(item) => item.id}
+            renderItem={renderScheduleItem}
+            scrollEnabled={false}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          />
+        )}
       </View>
 
       {/* 4. CTA */}

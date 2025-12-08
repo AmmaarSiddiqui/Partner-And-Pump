@@ -1,5 +1,4 @@
 // app/components/PlaceAutocomplete.jsx
-// Yasir: Gym search with Google Places, tappable dropdown
 
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -14,21 +13,23 @@ import { autocompleteGyms, getPlaceDetails } from "../../src/API/googlePlaces";
 
 export default function PlaceAutocomplete({
   placeholder = "Search your gym",
-  onSelect,           // <- single callback name everywhere
+  onSelect,
   initialValue = "",
 }) {
   const [query, setQuery] = useState(initialValue || "");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
+  const [hasUserTyped, setHasUserTyped] = useState(false); 
 
   const tokenRef = useRef(Math.random().toString(36).slice(2));
 
-  // keep input in sync if initialValue comes in later
+  // keep input in sync if initialValue comes in later,
+  // but only if user hasn't manually typed yet
   useEffect(() => {
-    if (initialValue && !query) {
+    if (!hasUserTyped && initialValue) {
       setQuery(initialValue);
     }
-  }, [initialValue, query]);
+  }, [initialValue, hasUserTyped]);
 
   // search as user types
   useEffect(() => {
@@ -58,8 +59,8 @@ export default function PlaceAutocomplete({
   const handlePick = async (item) => {
     console.log("[PlaceAutocomplete] pick:", item.placeId);
 
-    // show something immediately so it feels responsive
     const fallbackName = item.description || item.name || "";
+    setHasUserTyped(true);           // User effectively chose a value
     setQuery(fallbackName);
     setOpen(false);
     onSelect?.({
@@ -68,7 +69,6 @@ export default function PlaceAutocomplete({
       placeId: item.placeId,
     });
 
-    // then try to grab full details in the background
     try {
       const details = await getPlaceDetails(item.placeId, tokenRef.current);
       if (details) {
@@ -85,7 +85,10 @@ export default function PlaceAutocomplete({
     <View style={styles.wrapper}>
       <TextInput
         value={query}
-        onChangeText={setQuery}
+        onChangeText={(text) => {
+          setHasUserTyped(true);     //  as soon as they type, stop auto-resetting
+          setQuery(text);
+        }}
         placeholder={placeholder}
         placeholderTextColor="#9aa"
         style={styles.input}
@@ -97,6 +100,7 @@ export default function PlaceAutocomplete({
             keyboardShouldPersistTaps="handled"
             data={results}
             keyExtractor={(i) => i.placeId}
+            scrollEnabled={false}    // fixes nested ScrollView warning
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => handlePick(item)}
@@ -135,8 +139,8 @@ const styles = StyleSheet.create({
     borderColor: "#334",
     borderRadius: 12,
     maxHeight: 240,
-    zIndex: 50,      // <- helps taps work above other views
-    elevation: 10,   // <- Android
+    zIndex: 50,
+    elevation: 10,
   },
   item: {
     padding: 12,
@@ -147,4 +151,3 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
 });
-
