@@ -7,4 +7,11 @@ typings/
 
 # Node.js dependency directory
 node_modules/
+
+# Firebase local configs
 *.local
+
+# --- ENVIRONMENT VARIABLES (important!) ---
+.env
+.env.*
+!.env.example

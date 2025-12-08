@@ -8,7 +8,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { useTheme, useNavigation } from "@react-navigation/native";
+import { useTheme, useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
@@ -233,3 +233,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 });
+

@@ -38,7 +38,7 @@ export default function PostCard({ post }) {
 
     const newComment = {
       id: `${Date.now()}`,
-      username: "Demo User", // replace with real logged-in username if you have it
+      username: "You", // replace with real logged-in username if you have it
       text,
     };
 

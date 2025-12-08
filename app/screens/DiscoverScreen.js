@@ -49,20 +49,26 @@ export default function DiscoverScreen({ navigation }) {
   const { colors } = useTheme();
 
   // Upload button in the top-right of the Discover header
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          style={styles.uploadButton}
-          onPress={() => navigation.navigate("PumpNow")} // change route name if needed
-        >
-          <Text style={[styles.uploadButtonText, { color: colors.primary }]}>
-            Upload
-          </Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, colors.primary]);
+// app/screens/DiscoverScreen.js
+// ...
+
+useLayoutEffect(() => {
+  navigation.setOptions({
+    headerRight: () => (
+      <TouchableOpacity
+        style={styles.uploadButton}
+        onPress={() => navigation.navigate("Upload")} // ⬅️ route name matches Stack.Screen
+      >
+        <Text style={[styles.uploadButtonText, { color: colors.primary }]}>
+          Upload
+        </Text>
+      </TouchableOpacity>
+    ),
+  });
+}, [navigation, colors.primary]);
+
+// ...
+
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
