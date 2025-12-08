@@ -13,7 +13,9 @@ import UserCard from "../components/UserCard";
 import {
   computeCompatibilityScore,
   buildProfileTags,
+  getMaxCompatibilityScore,
 } from "../services/matching/compatibilityScore";
+
 export default function MatchListScreen({ route, navigation }) {
   const { colors } = useTheme();
   const { category, mode } = route.params; // "pumpNow" | "longTerm"
@@ -108,7 +110,7 @@ export default function MatchListScreen({ route, navigation }) {
         // logged in but no profile data yet: just show others, no score
         result = others.map((p) => ({
           id: p.id,
-          name: p.name || "Gym partner",
+          name: p.name || "John Kim",
           age: p.age || null,
           bio: p.about || "",
           tags: buildProfileTags(p, { mode }),
@@ -120,19 +122,25 @@ export default function MatchListScreen({ route, navigation }) {
         result = others
           .map((p) => {
             const rawScore = computeCompatibilityScore(profile, p, { mode, category });
-            const score = Math.round((rawScore / 10) * 100);
+            const maxScore = getMaxCompatibilityScore(mode);
+
+            const percentScore =
+              maxScore > 0 ? Math.round((rawScore / maxScore) * 100) : 0;
+
             return {
               id: p.id,
               name: p.name || "Gym partner",
               age: p.age || null,
               bio: p.about || "",
-              tags: buildProfileTags(p, { mode }),
+              tags: buildProfileTags(p, { mode, category }),
               scheduleDays: Array.isArray(p.days) ? p.days : [],
-              score,
+              score: percentScore,   // what you show in the UI
+              rawScore,              // what we filter/sort on
             };
           })
-          .filter((m) => m.score > 0)
-          .sort((a, b) => b.score - a.score);
+          // only drop people who are *literally* 0 score
+          .filter((m) => m.rawScore > 0)
+          .sort((a, b) => b.rawScore - a.rawScore);
       }
 
       if (isMounted) {

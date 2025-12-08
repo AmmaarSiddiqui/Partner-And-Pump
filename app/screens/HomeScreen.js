@@ -1,3 +1,4 @@
+// app/screens/HomeScreen.js
 import React, { useState } from "react";
 import {
   View,
@@ -7,91 +8,205 @@ import {
   ScrollView,
   FlatList,
 } from "react-native";
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../state/useAuthContext";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useMatches } from "../state/useMatchesContext";
+import { auth } from "../services/firebase";
 
-// TODO: BACKEND - Fetch "New Matches" notifications from the database (e.g., /api/notifications/matches).
-// This should return a list of users who have matched with the current user but haven't been chatted with yet.
-const MOCK_MATCH_NOTIFICATIONS = [
-  { id: "1", name: "Jessica Wu", goal: "Hypertrophy", time: "20m ago" },
-  { id: "2", name: "David Chen", goal: "Strength", time: "2h ago" },
-];
-
-// TODO: BACKEND - Fetch the user's schedule for the current day from the database (e.g., /api/schedule/today).
-// This might include planned workouts, meal times, or sessions scheduled via the ChatScreen.
+// --- MOCK SCHEDULE (until you wire real backend) ---
 const MOCK_SCHEDULE = [
   { id: "1", time: "07:00 AM", activity: "Morning Cardio", status: "completed" },
   { id: "2", time: "05:30 PM", activity: "Push Day (Chest & Tris)", status: "upcoming" },
   { id: "3", time: "07:00 PM", activity: "Post-Workout Meal", status: "upcoming" },
 ];
 
-
-export default function HomeScreen({ navigation }) {
-  const { profile } = useAuth();
-  const { colors } = useTheme();
-const { matches, acceptMatch } = useMatches();
-  const notifications = matches;
-
-
-  // TODO: BACKEND - Initialize this state with data fetched from the API.
-  // Consider using a real-time listener if notifications should appear instantly.
-
-  // Get current date formatted nicely (e.g., "Monday, Nov 25")
-  const today = new Date().toLocaleDateString("en-US", {
+// --- date helpers ---
+const formatLongDate = (date) =>
+  date.toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
     day: "numeric",
   });
 
-  const handleMatch = async (item) => {
-  await acceptMatch(item.requestId);
+const formatDateKey = (date) => date.toISOString().slice(0, 10);
 
-  navigation.navigate("Chat", {
-    recipientName: item.name,
-    recipientId: item.id,
+export default function HomeScreen({ navigation }) {
+  const { profile } = useAuth();
+  const { colors } = useTheme();
+  const { matches, acceptMatch, declineMatch } = useMatches();
+  const notifications = matches;
+
+  // ---- SCHEDULE STATE ----
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const [scheduleByDate, setScheduleByDate] = useState(() => {
+    const key = formatDateKey(new Date());
+    return { [key]: MOCK_SCHEDULE };
   });
-};
-  
-  const renderMatchNotification = ({ item }) => (
-    <View style={[styles.notificationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.notificationInfo}>
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>{item.name[0]}</Text>
+
+  const selectedDateKey = formatDateKey(selectedDate);
+  const selectedDateLabel = formatLongDate(selectedDate);
+  const schedule = scheduleByDate[selectedDateKey] || [];
+
+  // ---- SCHEDULE HELPERS ----
+
+  const handleAddSchedule = (newItem) => {
+    setScheduleByDate((prev) => {
+      const date = newItem.date ? new Date(newItem.date) : selectedDate;
+      const key = formatDateKey(date);
+      const existing = prev[key] || [];
+
+      const newEntry = {
+        id: String(existing.length + 1),
+        time: newItem.time,
+        activity: newItem.title,
+        status: "upcoming",
+      };
+
+      return {
+        ...prev,
+        [key]: [...existing, newEntry],
+      };
+    });
+  };
+
+  const goToPreviousDay = () => {
+    setSelectedDate((prev) => {
+      const d = new Date(prev);
+      d.setDate(prev.getDate() - 1);
+      return d;
+    });
+  };
+
+  const goToNextDay = () => {
+    setSelectedDate((prev) => {
+      const d = new Date(prev);
+      d.setDate(prev.getDate() + 1);
+      return d;
+    });
+  };
+
+  // ---- MATCH HANDLERS ----
+
+  const handleMatch = async (item) => {
+    try {
+      const myId = auth.currentUser?.uid;
+      if (!myId) return;
+
+      // 1) accept in backend
+      await acceptMatch(item.requestId);
+
+      // 2) matchId that ChatScreen expects
+      const otherId = item.id;
+      const matchId = [myId, otherId].sort().join("_");
+
+      // 3) go to chat
+      navigation.navigate("Chat", {
+        recipientName: item.name,
+        recipientId: otherId,
+        matchId,
+      });
+    } catch (err) {
+      console.log("❌ handleMatch FAILED:", err);
+    }
+  };
+
+  const handleDeclineMatch = async (item) => {
+    try {
+      await declineMatch(item.requestId);
+    } catch (err) {
+      console.log("⚠️ handleDeclineMatch FAILED:", err);
+    }
+  };
+
+  // ---- RENDERERS ----
+
+  const renderMatchNotification = ({ item }) => {
+    const isLongTerm = item.mode === "longTerm";
+    const typeLabel = isLongTerm ? "Long-Term" : "Pump Now";
+    const detailLabel = item.category ? `: ${item.category}` : "";
+
+    return (
+      <View
+        style={[
+          styles.notificationCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.notificationInfo}>
+          <View className="avatar" style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarText}>{item.name[0]}</Text>
+          </View>
+          <View>
+            <Text style={[styles.matchName, { color: colors.text }]}>
+              {item.name}
+            </Text>
+
+            <Text style={styles.matchDetail}>
+              {typeLabel}
+              {detailLabel}
+            </Text>
+          </View>
         </View>
-        <View>
-          <Text style={[styles.matchName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={styles.matchDetail}>{item.goal} • {item.time}</Text>
+
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            style={[
+              styles.matchButton,
+              { backgroundColor: colors.primary, marginRight: 8 },
+            ]}
+            onPress={() => handleMatch(item)}
+          >
+            <Text style={styles.matchButtonText}>Match</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.declineButton, { backgroundColor: "#FF3B30" }]}
+            onPress={() => handleDeclineMatch(item)}
+          >
+            <Text style={styles.matchButtonText}>Decline</Text>
+          </TouchableOpacity>
         </View>
       </View>
-      <TouchableOpacity
-        style={[styles.matchButton, { backgroundColor: colors.primary }]}
-        onPress={() => handleMatch(item)}
-      >
-        <Text style={styles.matchButtonText}>Match</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const renderScheduleItem = ({ item }) => (
     <View style={[styles.scheduleItem, { backgroundColor: colors.card }]}>
       <View style={styles.timeContainer}>
-        <Text style={[styles.timeText, { color: colors.text }]}>{item.time}</Text>
+        <Text style={[styles.timeText, { color: colors.text }]}>
+          {item.time}
+        </Text>
         {item.status === "completed" && (
-          <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginTop: 4 }} />
+          <Ionicons
+            name="checkmark-circle"
+            size={16}
+            color={colors.primary}
+            style={{ marginTop: 4 }}
+          />
         )}
       </View>
-      <View style={[styles.activityContainer, { borderLeftColor: colors.primary }]}>
-        <Text style={[styles.activityText, { color: colors.text }]}>{item.activity}</Text>
-        <Text style={styles.statusText}>{item.status === "completed" ? "Done" : "Up next"}</Text>
+      <View
+        style={[
+          styles.activityContainer,
+          { borderLeftColor: colors.primary },
+        ]}
+      >
+        <Text style={[styles.activityText, { color: colors.text }]}>
+          {item.activity}
+        </Text>
+        <Text style={styles.statusText}>
+          {item.status === "completed" ? "Done" : "Up next"}
+        </Text>
       </View>
     </View>
   );
 
+  // ---- UI ----
+
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
@@ -104,7 +219,7 @@ const { matches, acceptMatch } = useMatches();
             {profile?.name || "Lifter"} 👋
           </Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.profileButton, { backgroundColor: colors.card }]}
           onPress={() => navigation.navigate("Profile")}
         >
@@ -112,40 +227,95 @@ const { matches, acceptMatch } = useMatches();
         </TouchableOpacity>
       </View>
 
-      {/* 2. New Matches Section - Only show if there are notifications */}
+      {/* 2. New Matches */}
       {notifications.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>New Matches</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              New Matches
+            </Text>
             <View style={[styles.badge, { backgroundColor: colors.primary }]}>
               <Text style={styles.badgeText}>{notifications.length}</Text>
             </View>
           </View>
           <FlatList
             data={notifications}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.requestId}
             renderItem={renderMatchNotification}
-            scrollEnabled={false} // Let the parent ScrollView handle scrolling
+            scrollEnabled={false}
             contentContainerStyle={styles.listContent}
           />
         </View>
       )}
 
-      {/* 3. Calendar / Schedule Section */}
+      {/* 3. Schedule */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>
-          Today's Schedule
-        </Text>
-        
-        {/* Date Display */}
-        <View style={[styles.dateCard, { backgroundColor: colors.card }]}>
-          <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-          <Text style={[styles.dateText, { color: colors.text }]}>{today}</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            My Schedule
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.addScheduleButton,
+              { backgroundColor: colors.primary },
+            ]}
+            onPress={() =>
+              navigation.navigate("AddSchedule", {
+                onSave: handleAddSchedule,
+                initialDate: selectedDate,
+              })
+            }
+          >
+            <Ionicons
+              name="add"
+              size={16}
+              color="#FFFFFF"
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.addScheduleButtonText}>Add</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Timeline */}
+        {/* Date chooser */}
+        <View style={[styles.dateCard, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            style={styles.dateArrowButton}
+            onPress={goToPreviousDay}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+
+          <View style={styles.dateCenter}>
+            <Ionicons
+              name="calendar-outline"
+              size={20}
+              color={colors.primary}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={[styles.dateText, { color: colors.text }]}>
+              {selectedDateLabel}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.dateArrowButton}
+            onPress={goToNextDay}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        </View>
+
         <FlatList
-          data={MOCK_SCHEDULE}
+          data={schedule}
           keyExtractor={(item) => item.id}
           renderItem={renderScheduleItem}
           scrollEnabled={false}
@@ -153,17 +323,21 @@ const { matches, acceptMatch } = useMatches();
         />
       </View>
 
-      {/* 4. Main CTA */}
+      {/* 4. CTA */}
       <View style={styles.section}>
         <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: colors.primary }]}
           onPress={() => navigation.navigate("Match")}
         >
-          <Ionicons name="search" size={20} color="white" style={{ marginRight: 8 }} />
+          <Ionicons
+            name="search"
+            size={20}
+            color="white"
+            style={{ marginRight: 8 }}
+          />
           <Text style={styles.mainButtonText}>Find a New Partner</Text>
         </TouchableOpacity>
       </View>
-
     </ScrollView>
   );
 }
@@ -198,6 +372,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 15,
   },
   sectionTitle: {
@@ -215,7 +390,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-  // Notification Card Styles
+  addScheduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  addScheduleButtonText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 14,
+  },
   notificationCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -262,18 +448,26 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 12,
   },
-  // Schedule Styles
   dateCard: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
+    justifyContent: "space-between",
+  },
+  dateCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 1,
+  },
+  dateArrowButton: {
+    padding: 4,
   },
   dateText: {
     fontSize: 16,
     fontWeight: "600",
-    marginLeft: 10,
+    flexShrink: 1,
   },
   scheduleItem: {
     flexDirection: "row",
@@ -294,7 +488,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingLeft: 16,
     borderLeftWidth: 3,
-    marginLeft: 16, // Visual separation
+    marginLeft: 16,
     justifyContent: "center",
   },
   activityText: {
@@ -306,7 +500,6 @@ const styles = StyleSheet.create({
     color: "gray",
     fontSize: 12,
   },
-  // Main Button
   mainButton: {
     flexDirection: "row",
     paddingVertical: 16,
@@ -318,5 +511,10 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  declineButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
   },
 });

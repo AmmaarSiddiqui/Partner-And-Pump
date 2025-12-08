@@ -5,7 +5,9 @@ import React, {
   useMemo,
   useState,
   useEffect,
+  useRef,
 } from "react";
+import * as Notifications from "expo-notifications";
 
 import {
   addDoc,
@@ -39,27 +41,39 @@ const MatchesCtx = createContext(null);
 
 export function MatchesProvider({ children }) {
   const [matches, setMatches] = useState([]);
+  const prevRequestIdsRef = useRef(new Set());
 
   useEffect(() => {
     let unsubAuth = null;
     let unsubIncoming = null;
 
+    // 🔐 listen to auth state first
     unsubAuth = onAuthStateChanged(auth, (user) => {
-      // logged out → clear + stop listening
       if (!user) {
+        // logged out → clear + stop listening
         setMatches([]);
-        if (unsubIncoming) unsubIncoming();
+        prevRequestIdsRef.current = new Set();
+        if (unsubIncoming) {
+          unsubIncoming();
+          unsubIncoming = null;
+        }
         return;
       }
 
-      // listen for matchRequests where I'm the receiver
+      // 👇 DEFINE q *here*
       const q = query(
         collection(db, "matchRequests"),
         where("toUserId", "==", user.uid),
         where("status", "==", "pending")
       );
 
-      if (unsubIncoming) unsubIncoming();
+      // clean any previous listener
+      if (unsubIncoming) {
+        unsubIncoming();
+        unsubIncoming = null;
+      }
+
+      // 👇 USE q *here*
       unsubIncoming = onSnapshot(q, async (snap) => {
         const rows = await Promise.all(
           snap.docs.map(async (docSnap) => {
@@ -71,7 +85,7 @@ export function MatchesProvider({ children }) {
             const mode = data.mode || "";
             const days = Array.isArray(data.days) ? data.days : [];
 
-            // load sender's profile for name, age, bio
+            // load sender's profile for name
             let name = "Gym partner";
             try {
               const profSnap = await getDoc(doc(db, "profiles", fromUserId));
@@ -88,7 +102,7 @@ export function MatchesProvider({ children }) {
             }
 
             return {
-              id: fromUserId,  // other user UID
+              id: fromUserId, // other user UID
               name,
               category,
               mode,
@@ -97,6 +111,37 @@ export function MatchesProvider({ children }) {
             };
           })
         );
+
+        // 🔔 detect *new* requests
+        const prevIds = prevRequestIdsRef.current;
+        const newOnes = rows.filter((r) => !prevIds.has(r.requestId));
+
+        // send a local notification for each new one
+        newOnes.forEach(async (req) => {
+          const isLongTerm = req.mode === "longTerm";
+          const typeLabel = isLongTerm ? "Long-Term Request" : "Pump Now Request";
+
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: "New Match Request 💪",
+                body: `${req.name} sent you a ${typeLabel}${
+                  req.category ? ` (${req.category})` : ""
+                }`,
+                data: {
+                  requestId: req.requestId,
+                  fromUserId: req.id,
+                },
+              },
+              trigger: null, // send immediately
+            });
+          } catch (e) {
+            console.warn("[MatchesProvider] notification error:", e);
+          }
+        });
+
+        // update seen IDs so we don’t re-notify for old ones
+        prevRequestIdsRef.current = new Set(rows.map((r) => r.requestId));
 
         setMatches(rows);
       });
@@ -120,8 +165,8 @@ export function MatchesProvider({ children }) {
 
     try {
       await addDoc(collection(db, "matchRequests"), {
-        fromUserId: user.uid,        // sender = me
-        toUserId: m.id,              // receiver = other user
+        fromUserId: user.uid, // sender = me
+        toUserId: m.id, // receiver = other user
         category: m.category,
         mode: m.mode,
         days: Array.isArray(m.days) ? m.days : [],
@@ -160,11 +205,7 @@ export function MatchesProvider({ children }) {
   };
 
   /**
-   * acceptMatch: mark the request as accepted AND create a symmetric match
-   *
-   * This will:
-   *  - update /matchRequests/{requestId}.status = "accepted"
-   *  - create /matches doc with users: [me, otherUser]
+   * acceptMatch: mark the request as accepted AND create a symmetric match doc
    */
   const acceptMatch = async (requestId) => {
     const user = auth.currentUser;
@@ -192,24 +233,34 @@ export function MatchesProvider({ children }) {
 
       // 2) Create a shared match doc for BOTH accounts
       await addDoc(collection(db, "matches"), {
-        users: [user.uid, match.id],   // me + other user
+        users: [user.uid, match.id], // me + other user
         mode: match.mode,
         category: match.category,
         days: match.days,
         createdAt: serverTimestamp(),
       });
-
-      // No need to manually remove from `matches` state:
-      // our listener only includes status == "pending",
-      // so once we set status to "accepted", Firestore snapshot
-      // will stop returning this doc and the UI updates automatically.
     } catch (e) {
       console.warn("[MatchesProvider] acceptMatch error:", e);
     }
   };
 
+  /**
+   * declineMatch: mark the request as declined
+   */
+  const declineMatch = async (requestId) => {
+    try {
+      const reqRef = doc(db, "matchRequests", requestId);
+      await updateDoc(reqRef, {
+        status: "declined",
+        declinedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn("[MatchesProvider] declineMatch error:", e);
+    }
+  };
+
   const value = useMemo(
-    () => ({ matches, addMatch, cancelMatch, acceptMatch }),
+    () => ({ matches, addMatch, cancelMatch, acceptMatch, declineMatch }),
     [matches]
   );
 

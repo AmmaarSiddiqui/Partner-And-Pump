@@ -34,7 +34,7 @@ Before starting, ensure you have the following ready:
 1.  **Clone the Repository**
     Open your terminal/command prompt and run the following command to download the source code:
     ```bash
-    git clone [https://github.com/AmmaarSiddiqui/Partner-And-Pump.git](https://github.com/AmmaarSiddiqui/Partner-And-Pump.git)
+    git clone https://github.com/AmmaarSiddiqui/Partner-And-Pump.git
     ```
 
 2.  **Navigate to the Directory**
