@@ -20,6 +20,7 @@ import MatchListScreen from "../screens/MatchListScreen";
 import DiscoverScreen from "../screens/DiscoverScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import MessagesScreen from "../screens/MessagesScreen";
+import UploadScreen from "../screens/UploadScreen";
 import ChatScreen from "../screens/ChatScreen";
 import ProfileStack from "./ProfileStack";
 
@@ -160,6 +161,11 @@ export default function AppNavigator() {
             <Stack.Screen
               name="Chat"
               component={ChatScreen}
+            />
+            <Stack.Screen
+            name="Upload"
+            component={UploadScreen}
+            options={{ title: "Upload Post" }}
             />
           </Stack.Group>)
         )}
