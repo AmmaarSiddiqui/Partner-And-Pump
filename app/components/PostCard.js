@@ -46,6 +46,11 @@ export default function PostCard({ post }) {
     setCommentText("");
   };
 
+const mainImageSource = post.imageBase64
+  ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
+  : { uri: getPlaceholderImage(post.imageSeed || post.id) };
+  
+  
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
       {/* Post Header (avatar + username only) */}
@@ -62,10 +67,7 @@ export default function PostCard({ post }) {
       </View>
 
       {/* Post Image */}
-      <Image
-        source={{ uri: getPlaceholderImage(post.imageSeed) }}
-        style={styles.image}
-      />
+      <Image source={mainImageSource} style={styles.image} />
 
       {/* Post Footer (Actions & Caption) */}
       <View style={styles.footer}>
