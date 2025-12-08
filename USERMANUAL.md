@@ -117,6 +117,8 @@ Use this feature when you need a partner for a single session, right now or late
 5.  Match request is sent and now you wait for the recipients response
 6.  When they accept, a new chat will automatically open in your messages tab so you can coordinate the details (e.g., "Meet by the squat racks at 5:30?").
 7.  To cancel a match, go to **Profile** and scroll down where you see your matches.
+8.  WILL NOT SHOW ANYONE IF 0% COMPATIBILITY
+
 
 ### Finding a Long-Term Partner
 Use this feature to find a consistent partner who matches your weekly routine and long-term goals.
@@ -127,6 +129,7 @@ Use this feature to find a consistent partner who matches your weekly routine an
 5.  Match request is sent and now you wait for the recipients response
 6.  When they accept, a new chat will automatically open in your messages tab so you can coordinate the details (e.g., "What days and times work best for you?").
 7.  To cancel a match, go to **Profile** and scroll down where you see your matches.
+8.  WILL NOT SHOW ANYONE IF 0% COMPATIBILITY
 
 
 ### The Discover Feed (In Development)
