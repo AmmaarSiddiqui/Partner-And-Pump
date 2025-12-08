@@ -1,3 +1,4 @@
+// app/screens/HomeScreen.js
 import React, { useState } from "react";
 import {
   View,
@@ -11,14 +12,9 @@ import { useAuth } from "../state/useAuthContext";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useMatches } from "../state/useMatchesContext";
+import { auth } from "../services/firebase";
 
-// TODO: BACKEND - Fetch "New Matches" notifications from the database.
-const MOCK_MATCH_NOTIFICATIONS = [
-  { id: "1", name: "Jessica Wu", goal: "Hypertrophy", time: "20m ago" },
-  { id: "2", name: "David Chen", goal: "Strength", time: "2h ago" },
-];
-
-// TODO: BACKEND - Fetch the user's schedule for the current day from the database.
+// --- MOCK SCHEDULE (until you wire real backend) ---
 const MOCK_SCHEDULE = [
   { id: "1", time: "07:00 AM", activity: "Morning Cardio", status: "completed" },
   { id: "2", time: "05:30 PM", activity: "Push Day (Chest & Tris)", status: "upcoming" },
@@ -38,13 +34,12 @@ const formatDateKey = (date) => date.toISOString().slice(0, 10);
 export default function HomeScreen({ navigation }) {
   const { profile } = useAuth();
   const { colors } = useTheme();
-  const { matches, acceptMatch } = useMatches();
+  const { matches, acceptMatch, declineMatch } = useMatches();
   const notifications = matches;
 
-  // current date user is viewing
+  // ---- SCHEDULE STATE ----
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // schedules stored by date key
   const [scheduleByDate, setScheduleByDate] = useState(() => {
     const key = formatDateKey(new Date());
     return { [key]: MOCK_SCHEDULE };
@@ -54,16 +49,8 @@ export default function HomeScreen({ navigation }) {
   const selectedDateLabel = formatLongDate(selectedDate);
   const schedule = scheduleByDate[selectedDateKey] || [];
 
-  const handleMatch = async (item) => {
-    await acceptMatch(item.requestId);
+  // ---- SCHEDULE HELPERS ----
 
-    navigation.navigate("Chat", {
-      recipientName: item.name,
-      recipientId: item.id,
-    });
-  };
-
-  // called from AddScheduleScreen via onSave
   const handleAddSchedule = (newItem) => {
     setScheduleByDate((prev) => {
       const date = newItem.date ? new Date(newItem.date) : selectedDate;
@@ -100,34 +87,90 @@ export default function HomeScreen({ navigation }) {
     });
   };
 
-  const renderMatchNotification = ({ item }) => (
-    <View
-      style={[
-        styles.notificationCard,
-        { backgroundColor: colors.card, borderColor: colors.border },
-      ]}
-    >
-      <View style={styles.notificationInfo}>
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>{item.name[0]}</Text>
+  // ---- MATCH HANDLERS ----
+
+  const handleMatch = async (item) => {
+    try {
+      const myId = auth.currentUser?.uid;
+      if (!myId) return;
+
+      // 1) accept in backend
+      await acceptMatch(item.requestId);
+
+      // 2) matchId that ChatScreen expects
+      const otherId = item.id;
+      const matchId = [myId, otherId].sort().join("_");
+
+      // 3) go to chat
+      navigation.navigate("Chat", {
+        recipientName: item.name,
+        recipientId: otherId,
+        matchId,
+      });
+    } catch (err) {
+      console.log("❌ handleMatch FAILED:", err);
+    }
+  };
+
+  const handleDeclineMatch = async (item) => {
+    try {
+      await declineMatch(item.requestId);
+    } catch (err) {
+      console.log("⚠️ handleDeclineMatch FAILED:", err);
+    }
+  };
+
+  // ---- RENDERERS ----
+
+  const renderMatchNotification = ({ item }) => {
+    const isLongTerm = item.mode === "longTerm";
+    const typeLabel = isLongTerm ? "Long-Term" : "Pump Now";
+    const detailLabel = item.category ? `: ${item.category}` : "";
+
+    return (
+      <View
+        style={[
+          styles.notificationCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.notificationInfo}>
+          <View className="avatar" style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarText}>{item.name[0]}</Text>
+          </View>
+          <View>
+            <Text style={[styles.matchName, { color: colors.text }]}>
+              {item.name}
+            </Text>
+
+            <Text style={styles.matchDetail}>
+              {typeLabel}
+              {detailLabel}
+            </Text>
+          </View>
         </View>
-        <View>
-          <Text style={[styles.matchName, { color: colors.text }]}>
-            {item.name}
-          </Text>
-          <Text style={styles.matchDetail}>
-            {item.goal} • {item.time}
-          </Text>
+
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            style={[
+              styles.matchButton,
+              { backgroundColor: colors.primary, marginRight: 8 },
+            ]}
+            onPress={() => handleMatch(item)}
+          >
+            <Text style={styles.matchButtonText}>Match</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.declineButton, { backgroundColor: "#FF3B30" }]}
+            onPress={() => handleDeclineMatch(item)}
+          >
+            <Text style={styles.matchButtonText}>Decline</Text>
+          </TouchableOpacity>
         </View>
       </View>
-      <TouchableOpacity
-        style={[styles.matchButton, { backgroundColor: colors.primary }]}
-        onPress={() => handleMatch(item)}
-      >
-        <Text style={styles.matchButtonText}>Match</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const renderScheduleItem = ({ item }) => (
     <View style={[styles.scheduleItem, { backgroundColor: colors.card }]}>
@@ -160,6 +203,8 @@ export default function HomeScreen({ navigation }) {
     </View>
   );
 
+  // ---- UI ----
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -182,7 +227,7 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* 2. New Matches Section - Only show if there are notifications */}
+      {/* 2. New Matches */}
       {notifications.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -195,7 +240,7 @@ export default function HomeScreen({ navigation }) {
           </View>
           <FlatList
             data={notifications}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.requestId}
             renderItem={renderMatchNotification}
             scrollEnabled={false}
             contentContainerStyle={styles.listContent}
@@ -203,9 +248,8 @@ export default function HomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* 3. Calendar / Schedule Section */}
+      {/* 3. Schedule */}
       <View style={styles.section}>
-        {/* header row with title + add button */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             My Schedule
@@ -233,7 +277,7 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Date card with left/right arrows */}
+        {/* Date chooser */}
         <View style={[styles.dateCard, { backgroundColor: colors.card }]}>
           <TouchableOpacity
             style={styles.dateArrowButton}
@@ -270,7 +314,6 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Timeline for the selected date */}
         <FlatList
           data={schedule}
           keyExtractor={(item) => item.id}
@@ -280,7 +323,7 @@ export default function HomeScreen({ navigation }) {
         />
       </View>
 
-      {/* 4. Main CTA */}
+      {/* 4. CTA */}
       <View style={styles.section}>
         <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: colors.primary }]}
@@ -347,7 +390,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-  // Add button in schedule header
   addScheduleButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -360,7 +402,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
   },
-  // Notification Card Styles
   notificationCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -407,7 +448,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 12,
   },
-  // Date card + arrows
   dateCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -429,7 +469,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flexShrink: 1,
   },
-  // Schedule Styles
   scheduleItem: {
     flexDirection: "row",
     padding: 16,
@@ -461,7 +500,6 @@ const styles = StyleSheet.create({
     color: "gray",
     fontSize: 12,
   },
-  // Main Button
   mainButton: {
     flexDirection: "row",
     paddingVertical: 16,
@@ -473,5 +511,10 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  declineButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
   },
 });

@@ -1,15 +1,33 @@
 import React from "react";
-import { View, Text, Button, StyleSheet, Alert } from "react-native";
+import { View, Text, Button, StyleSheet } from "react-native";
 
-export default function MatchCard({ name, gym, goal, score }) {
+export default function MatchCard({
+  name,
+  gym,
+  goal,
+  score,
+  mode,        // "pumpNow" | "longTerm"
+  category,    // split or activity
+  onSendRequest,
+}) {
+  const label =
+    mode === "longTerm"
+      ? `Long-Term • Split: ${category}`
+      : `Pump Now • Activity: ${category}`;
+
   return (
     <View style={styles.card}>
       <Text style={styles.name}>{name}</Text>
+
       <Text style={styles.line}>Gym: {gym}</Text>
       <Text style={styles.line}>Goal: {goal}</Text>
+      <Text style={styles.line}>{label}</Text>
+
       <Text style={styles.score}>Compatibility: {score}%</Text>
+
       <View style={{ height: 8 }} />
-      <Button title="Send Request" onPress={() => Alert.alert("Request sent")} />
+
+      <Button title="Send Request" onPress={onSendRequest} />
     </View>
   );
 }

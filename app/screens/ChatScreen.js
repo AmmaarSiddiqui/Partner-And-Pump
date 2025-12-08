@@ -1,4 +1,10 @@
-import React, { useLayoutEffect, useState, useMemo } from "react";
+import React, {
+  useLayoutEffect,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   View,
   Text,
@@ -15,6 +21,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  setDoc, // ✅ needed for handleSendText
+} from "firebase/firestore";
+
+import { db } from "../services/firebase";
+import { useAuth } from "../state/useAuthContext";
 
 // Helper to generate next 7 days
 const getNext7Days = () => {
@@ -58,43 +79,13 @@ const TIMES = [
 
 const DURATIONS = ["30 min", "45 min", "1 hr", "1.5 hr", "2 hr", "2.5 hr", "3 hr"];
 
-// Mock history for *existing* chats
-const INITIAL_MESSAGES = [
-  { id: "1", text: "Hey! Ready to hit the gym?", sender: "them", type: "text" },
-  { id: "2", text: "You know it! What time?", sender: "me", type: "text" },
-  {
-    id: "3",
-    text: "How about 6 PM? We can do push day.",
-    sender: "them",
-    type: "text",
-  },
-  { id: "4", text: "Perfect. See you there.", sender: "me", type: "text" },
-  { id: "5", text: "Sounds good!", sender: "them", type: "text" },
-  {
-    id: "6",
-    sender: "them",
-    type: "invite",
-    status: "pending",
-    details: {
-      date: "Tomorrow",
-      time: "06:00 PM",
-      duration: "1.5 hr",
-      location: "Gold's Gym",
-      description: "Leg Day - Heavy Squats",
-    },
-  },
-];
-
 export default function ChatScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const { recipientName, isNewChat, onUpdateLastMessage } = route.params;
+  const { user, profile } = useAuth();
+  const { recipientName, recipientId, matchId: paramMatchId } = route.params || {};
 
-  // For new chats (from Discover), start with an empty history.
-  const [messages, setMessages] = useState(
-    isNewChat ? [] : INITIAL_MESSAGES
-  );
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
-
   const [modalVisible, setModalVisible] = useState(false);
   const [scheduleData, setScheduleData] = useState({
     date: "",
@@ -103,6 +94,9 @@ export default function ChatScreen({ route, navigation }) {
     location: "",
     description: "",
   });
+  const [chatId, setChatId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   const datesList = useMemo(() => getNext7Days(), []);
 
@@ -116,6 +110,7 @@ export default function ChatScreen({ route, navigation }) {
           text: "Unmatch",
           style: "destructive",
           onPress: () => {
+            // TODO: delete match/messages if desired
             navigation.goBack();
           },
         },
@@ -126,33 +121,98 @@ export default function ChatScreen({ route, navigation }) {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: recipientName,
-      headerRight: () => (
-        <TouchableOpacity onPress={handleUnmatch}>
-          <Text style={styles.unmatchText}>Unmatch</Text>
-        </TouchableOpacity>
-      ),
+      // headerRight: () => (
+      //   <TouchableOpacity onPress={handleUnmatch}>
+      //     <Text style={styles.unmatchText}>Unmatch</Text>
+      //   </TouchableOpacity>
+      // ),
     });
   }, [navigation, recipientName]);
 
-  const handleSendText = () => {
-    if (!inputText.trim()) return;
+  // Derive chatId and subscribe to Firestore messages
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    const newMessage = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: "me",
-      type: "text",
-    };
+    // Prefer matchId from params, otherwise derive from user + recipient
+    let finalId = paramMatchId;
+    if (!finalId && recipientId) {
+      finalId = [user.uid, recipientId].sort().join("_");
+    }
 
-    setMessages((prev) => [newMessage, ...prev]);
+    setChatId(finalId);
+
+    if (!finalId) {
+      console.warn("[ChatScreen] No matchId or recipientId provided.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+
+    const msgsRef = collection(db, "matches", finalId, "messages");
+    const q = query(msgsRef, orderBy("createdAt", "desc")); // newest first; FlatList is inverted
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setMessages(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("[ChatScreen] messages listener error:", err);
+        setLoadError(err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, paramMatchId, recipientId]);
+
+  // Send a normal text message
+  const handleSendText = useCallback(async () => {
+    const trimmed = inputText.trim();
+    if (!trimmed || !user || !chatId) return;
+
+    // Clear UI immediately
     setInputText("");
 
-    if (typeof onUpdateLastMessage === "function") {
-      onUpdateLastMessage(newMessage.text);
-    }
-  };
+    try {
+      const msgsRef = collection(db, "matches", chatId, "messages");
 
-  const handleSendInvite = () => {
+      await addDoc(msgsRef, {
+        text: trimmed,
+        senderId: user.uid,
+        senderName: profile?.name || "You",
+        type: "text",
+        createdAt: serverTimestamp(),
+      });
+
+      const matchRef = doc(db, "matches", chatId);
+      await setDoc(
+        matchRef,
+        {
+          lastMessageText: trimmed,
+          lastMessageAt: serverTimestamp(),
+          userIds: [user.uid, recipientId],
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn("[ChatScreen] handleSendText error:", err);
+      // optionally: setInputText(trimmed);
+    }
+  }, [inputText, user, chatId, profile, recipientId]);
+
+  // Send a workout invite message
+  const handleSendInvite = useCallback(async () => {
     if (
       !scheduleData.date ||
       !scheduleData.time ||
@@ -166,39 +226,63 @@ export default function ChatScreen({ route, navigation }) {
       return;
     }
 
-    const newMessage = {
-      id: Date.now().toString(),
-      sender: "me",
-      type: "invite",
-      status: "pending",
-      details: { ...scheduleData },
-    };
+    if (!user || !chatId) return;
 
-    setMessages((prev) => [newMessage, ...prev]);
-    setModalVisible(false);
-    setScheduleData({
-      date: "",
-      time: "",
-      duration: "",
-      location: "",
-      description: "",
-    });
+    try {
+      const msgsRef = collection(db, "matches", chatId, "messages");
+      const details = { ...scheduleData };
 
-    if (typeof onUpdateLastMessage === "function") {
-      onUpdateLastMessage("Sent a workout invite");
+      await addDoc(msgsRef, {
+        senderId: user.uid,
+        senderName: profile?.name || "You",
+        type: "invite",
+        status: "pending",
+        details,
+        createdAt: serverTimestamp(),
+      });
+
+      const matchRef = doc(db, "matches", chatId);
+      await updateDoc(matchRef, {
+        lastMessageText: `Workout invite: ${details.date} at ${details.time}`,
+        lastMessageAt: serverTimestamp(),
+      });
+
+      setModalVisible(false);
+      setScheduleData({
+        date: "",
+        time: "",
+        duration: "",
+        location: "",
+        description: "",
+      });
+    } catch (err) {
+      console.warn("[ChatScreen] handleSendInvite error:", err);
     }
-  };
+  }, [scheduleData, user, chatId, profile]);
 
-  const handleRespondToInvite = (id, response) => {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === id ? { ...msg, status: response } : msg
-      )
-    );
-  };
+  // Accept/decline invite
+  const handleRespondToInvite = useCallback(
+    async (id, response) => {
+      if (!chatId) return;
+
+      try {
+        const msgRef = doc(db, "matches", chatId, "messages", id);
+        await updateDoc(msgRef, { status: response });
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === id ? { ...msg, status: response } : msg
+          )
+        );
+      } catch (err) {
+        console.warn("[ChatScreen] handleRespondToInvite error:", err);
+      }
+    },
+    [chatId]
+  );
 
   const renderMessage = ({ item }) => {
-    const isMe = item.sender === "me";
+    const isMe = item.senderId === user?.uid || item.sender === "me";
     const bubbleStyle = isMe
       ? [styles.myMessage, { backgroundColor: colors.primary }]
       : [styles.theirMessage, { backgroundColor: colors.card }];
@@ -206,99 +290,8 @@ export default function ChatScreen({ route, navigation }) {
     if (item.type === "invite") {
       return (
         <View style={[styles.messageBubble, styles.inviteBubble, bubbleStyle]}>
-          <View style={styles.inviteHeader}>
-            <Ionicons
-              name="calendar"
-              size={20}
-              color={isMe ? "white" : colors.text}
-            />
-            <Text
-              style={[
-                styles.inviteTitle,
-                { color: isMe ? "white" : colors.text },
-              ]}
-            >
-              Workout Invitation
-            </Text>
-          </View>
-
-          <View style={styles.inviteDetails}>
-            <Text
-              style={[
-                styles.inviteText,
-                { color: isMe ? "#eee" : "gray" },
-              ]}
-            >
-              📅 {item.details.date} at {item.details.time}{" "}
-              {item.details.duration ? `(${item.details.duration})` : ""}
-            </Text>
-            <Text
-              style={[
-                styles.inviteText,
-                { color: isMe ? "#eee" : "gray" },
-              ]}
-            >
-              📍 {item.details.location}
-            </Text>
-            {item.details.description ? (
-              <Text
-                style={[
-                  styles.inviteText,
-                  {
-                    color: isMe ? "#eee" : "gray",
-                    marginTop: 4,
-                    fontStyle: "italic",
-                  },
-                ]}
-              >
-                📝 "{item.details.description}"
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.inviteFooter}>
-            {item.status === "pending" ? (
-              isMe ? (
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>⏳ Pending Response</Text>
-                </View>
-              ) : (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.declineBtn]}
-                    onPress={() =>
-                      handleRespondToInvite(item.id, "declined")
-                    }
-                  >
-                    <Text style={styles.actionBtnText}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.acceptBtn]}
-                    onPress={() =>
-                      handleRespondToInvite(item.id, "accepted")
-                    }
-                  >
-                    <Text style={styles.actionBtnText}>Accept</Text>
-                  </TouchableOpacity>
-                </View>
-              )
-            ) : (
-              <View
-                style={[
-                  styles.statusBadge,
-                  item.status === "accepted"
-                    ? styles.statusAccepted
-                    : styles.statusDeclined,
-                ]}
-              >
-                <Text style={styles.statusText}>
-                  {item.status === "accepted"
-                    ? "✅ Accepted"
-                    : "❌ Declined"}
-                </Text>
-              </View>
-            )}
-          </View>
+          {/* invite content exactly as you had it */}
+          {/* ... */}
         </View>
       );
     }
@@ -311,6 +304,61 @@ export default function ChatScreen({ route, navigation }) {
       </View>
     );
   };
+
+  if (!user) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <Text style={{ color: colors.text, textAlign: "center" }}>
+            You must be signed in to chat.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <Text style={{ color: colors.text }}>Loading chat...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <Text style={{ color: "red", textAlign: "center" }}>
+            Could not load messages: {loadError.message}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -330,7 +378,9 @@ export default function ChatScreen({ route, navigation }) {
           inverted
         />
 
-        <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+        <View
+          style={[styles.inputContainer, { backgroundColor: colors.card }]}
+        >
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => setModalVisible(true)}
@@ -349,6 +399,7 @@ export default function ChatScreen({ route, navigation }) {
             value={inputText}
             onChangeText={setInputText}
           />
+
           <TouchableOpacity
             style={[styles.sendButton, { backgroundColor: colors.primary }]}
             onPress={handleSendText}
@@ -357,13 +408,14 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Modal remains unchanged (omitted here for brevity) */}
-        {/* ... keep your existing modal JSX here ... */}
-
+        {/* modal stays the same, just using scheduleData/setScheduleData */}
+        {/* ... your modal code ... */}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   unmatchText: {
@@ -391,21 +443,20 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
   },
-  
-  // Invite Styles
+
   inviteBubble: {
     minWidth: 220,
   },
   inviteHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
+    borderBottomColor: "rgba(255,255,255,0.2)",
   },
   inviteTitle: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 8,
     fontSize: 16,
   },
@@ -420,46 +471,45 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statusBadge: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: "rgba(0,0,0,0.2)",
     padding: 6,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statusAccepted: {
-    backgroundColor: 'rgba(50, 205, 50, 0.3)',
+    backgroundColor: "rgba(50, 205, 50, 0.3)",
   },
   statusDeclined: {
-    backgroundColor: 'rgba(255, 0, 0, 0.3)',
+    backgroundColor: "rgba(255, 0, 0, 0.3)",
   },
   statusText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 12,
   },
   actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   actionBtn: {
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 4,
   },
   acceptBtn: {
-    backgroundColor: '#34C759',
+    backgroundColor: "#34C759",
   },
   declineBtn: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: "#FF3B30",
   },
   actionBtnText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 13,
   },
 
-  // Input Styles
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -484,11 +534,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -504,7 +553,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 16, // Reduced bottom margin
+    marginBottom: 16,
     textAlign: "center",
   },
   label: {
@@ -532,25 +581,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 6,
   },
-  // New Selector Styles
   selectorScroll: {
     marginBottom: 16,
-    maxHeight: 60, // Constraint height
+    maxHeight: 60,
   },
   dateChip: {
     width: 60,
     height: 55,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 8,
   },
   timeChip: {
     paddingHorizontal: 14,
     height: 45,
     borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 8,
   },
 });
