@@ -7,7 +7,7 @@
 #### Prerequisites
 | Tool | Version | Purpose |
 |------|----------|----------|
-| Node.js | ≥ 18.x | JavaScript runtime |
+| Node.js | ≥ 22.x | JavaScript runtime |
 | npm | ≥ 9.x | Package manager |
 | Expo CLI | 6.x | Run React Native apps |
 
@@ -35,7 +35,6 @@ Partner-And-Pump/
 ├─ functions/
 │  ├─ __tests__/
 │  ├─ src/
-│  │  ├─ match/
 │  │  ├─ notifications/
 │  │  └─ validation/
 │  ├─ jest.config.js
@@ -47,6 +46,7 @@ Partner-And-Pump/
 ├─ src/
 ├─ .gitignore
 ├─ App.js
+├─ .env.example
 ├─ DeveloperDocument.md
 ├─ README.md
 ├─ USERMANUAL.md
@@ -69,14 +69,13 @@ This project has two build targets:
 Follow the steps below to build all components locally and verify everything with tests.
 
 #### Install once
-    * **Windows users:** Run `npm i -g firebase-tools`
-    * **macOS/Linux users:** You will likely need to use `sudo` to grant permission:
+* Windows users: Run 
+    ```npm i -g firebase-tools```
+* macOS/Linux users: You will likely need to use `sudo` to grant permission:
         ```bash
         sudo npm i -g firebase-tools
         ```
-```
-npm install expo
-```
+* Also do this step: ``` npm install ```
 
 #### Expo CLI is invoked via npx, no global install required
 
@@ -97,7 +96,7 @@ npm ci
 cd ..
 ```
 #### Environment Variables
-Make sure to email mas954@uw.edu for environment variables. To use them, create an.env file and follow the .env.example formatting using the given environment variables.
+Make sure to email mas954@uw.edu for environment variables. To use them, create an .env file in the root directory and follow the .env.example in the root directory formatting using the given environment variables.
 
 2) Build & run the mobile client (Expo)
 #### From repo root
@@ -112,6 +111,13 @@ Scan the QR code with Expo Go (iOS/Android) to open Partner And Pump on your dev
 Make sure your phone and computer are on the same network.
 
 This will prebuild native projects and open the iOS Simulator.
+
+**NOTE**: 
+If you wish to run 2 devices at once, you will have to create an account on expo go and:
+```
+npx expo login
+```
+If you only want to use one device at a time, simply follow the prompt and procceed anonymously.
 
 
 3) Build & run the backend (Cloud Functions)
