@@ -7,20 +7,30 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { useTheme } from "@react-navigation/native";
+import { useTheme, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { db } from "../services/firebase";
-import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  arrayUnion,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+} from "firebase/firestore";
 import { useAuth } from "../state/useAuthContext";
 
-// Using a placeholder for images
 const getPlaceholderImage = (seed) =>
   `https://picsum.photos/seed/${seed}/600/800`;
 
 export default function PostCard({ post }) {
   const { colors } = useTheme();
-  const { user, profile } = useAuth();
+  const navigation = useNavigation(); // like MessagesScreen
+  const { user } = useAuth();
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes || 0);
@@ -28,37 +38,86 @@ export default function PostCard({ post }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  const displayName =
-    profile?.username ||
-    profile?.displayName ||
-    profile?.name ||
-    user?.email ||
-    "You";
+  const postRef = doc(db, "posts", post.id);
 
-  const mainImageSource = post.imageBase64
-    ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
-    : { uri: getPlaceholderImage(post.imageSeed || post.id) };
+  // figure out owner once so we can use it both for UI + handler
+  const ownerId = post.ownerId || post.userId || post.uid || null;
+  const isOwnPost = user && ownerId === user.uid;
 
-  const handleLikePress = async () => {
+  const handleMessagePress = async () => {
     if (!user) return;
 
-    const wasLiked = liked;
-    const delta = wasLiked ? -1 : 1;
+    if (!ownerId) {
+      console.log("[PostCard] No ownerId on post, cannot start chat.");
+      return;
+    }
 
-    // optimistic UI update
-    setLiked(!wasLiked);
-    setLikeCount((prev) => prev + delta);
+    // don't DM yourself (extra guard even if button somehow shows)
+    if (ownerId === user.uid) {
+      console.log("[PostCard] Tried to DM yourself, skipping.");
+      return;
+    }
 
     try {
-      const postRef = doc(db, "posts", post.id);
-      await updateDoc(postRef, {
-        likes: increment(delta),
+      // use same collection as MessagesScreen
+      const matchesRef = collection(db, "matches");
+
+      // stable pair ordering
+      const pair = [user.uid, ownerId].sort();
+      const pairKey = pair.join("_");
+
+      // get all matches that include me
+      const q = query(matchesRef, where("userIds", "array-contains", user.uid));
+      const snap = await getDocs(q);
+
+      let chatId = null;
+
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        if (Array.isArray(data.userIds) && data.userIds.includes(ownerId)) {
+          chatId = docSnap.id; // existing conversation between me + owner
+        }
       });
-    } catch (e) {
-      console.error("Error updating likes:", e);
-      // rollback on error
-      setLiked(wasLiked);
-      setLikeCount((prev) => prev - delta);
+
+      // if no existing match/chat, create one
+      if (!chatId) {
+        const newMatchDoc = await addDoc(matchesRef, {
+          userIds: pair,
+          userPair: pairKey,
+          createdAt: serverTimestamp(),
+          lastMessageAt: null,
+          lastMessageText: "",
+        });
+        chatId = newMatchDoc.id;
+      }
+
+      // navigate to Chat using same params as MessagesScreen / ChatScreen
+      navigation.navigate("Chat", {
+        recipientName: post.username,
+        matchId: chatId,
+        recipientId: ownerId,
+      });
+    } catch (err) {
+      console.log("Error starting chat from post:", err);
+    }
+  };
+
+  const handleLikePress = async () => {
+    const nextLiked = !liked;
+    const nextCount = likeCount + (nextLiked ? 1 : -1);
+
+    setLiked(nextLiked);
+    setLikeCount(nextCount);
+
+    try {
+      await updateDoc(postRef, {
+        likes: nextCount,
+      });
+    } catch (err) {
+      console.log("Error updating likes:", err);
+      // revert on error
+      setLiked(liked);
+      setLikeCount(likeCount);
     }
   };
 
@@ -68,12 +127,15 @@ export default function PostCard({ post }) {
 
   const handleAddComment = async () => {
     const text = commentText.trim();
-    if (!text || !user) return;
+    if (!text) return;
 
     const newComment = {
       id: `${Date.now()}`,
-      username: displayName,
+      userId: user?.uid || "anon",
+      username: user?.displayName || post.username || "You",
       text,
+      // Use a normal timestamp here; we won't put serverTimestamp inside arrayUnion
+      createdAt: new Date().toISOString(),
     };
 
     // optimistic UI
@@ -81,19 +143,23 @@ export default function PostCard({ post }) {
     setCommentText("");
 
     try {
-      const postRef = doc(db, "posts", post.id);
       await updateDoc(postRef, {
+        // IMPORTANT: don't wrap serverTimestamp() inside arrayUnion
         comments: arrayUnion(newComment),
       });
-    } catch (e) {
-      console.error("Error adding comment:", e);
-      // (optional) you could rollback here if you want
+    } catch (err) {
+      console.log("Error adding comment:", err);
+      // you could rollback here if you want
     }
   };
 
+  const mainImageSource = post.imageBase64
+    ? { uri: `data:image/jpeg;base64,${post.imageBase64}` }
+    : { uri: getPlaceholderImage(post.imageSeed || post.id) };
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
-      {/* Post Header (avatar + username only) */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
@@ -106,18 +172,14 @@ export default function PostCard({ post }) {
         </View>
       </View>
 
-      {/* Post Image */}
+      {/* Image */}
       <Image source={mainImageSource} style={styles.image} />
 
-      {/* Post Footer (Actions & Caption) */}
+      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.actions}>
           {/* Like */}
-          <TouchableOpacity
-            onPress={handleLikePress}
-            style={styles.actionButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
+          <TouchableOpacity onPress={handleLikePress} style={styles.actionButton}>
             <Ionicons
               name={liked ? "heart" : "heart-outline"}
               size={24}
@@ -133,7 +195,6 @@ export default function PostCard({ post }) {
           <TouchableOpacity
             onPress={handleToggleComments}
             style={styles.actionButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons
               name="chatbubble-outline"
@@ -145,6 +206,16 @@ export default function PostCard({ post }) {
               {comments.length} Comments
             </Text>
           </TouchableOpacity>
+
+          {/* Message Owner - only show if this is NOT my own post */}
+          {!isOwnPost && (
+            <TouchableOpacity
+              style={styles.messageBtn}
+              onPress={handleMessagePress}
+            >
+              <Text style={styles.messageBtnText}>Message</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={[styles.caption, { color: colors.text }]}>
@@ -152,7 +223,7 @@ export default function PostCard({ post }) {
           {post.caption}
         </Text>
 
-        {/* Comments list + input */}
+        {/* Comments */}
         {showComments && (
           <View style={styles.commentsSection}>
             {comments.map((c) => (
@@ -178,10 +249,7 @@ export default function PostCard({ post }) {
                 returnKeyType="send"
                 onSubmitEditing={handleAddComment}
               />
-              <TouchableOpacity
-                onPress={handleAddComment}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
+              <TouchableOpacity onPress={handleAddComment}>
                 <Ionicons name="send" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
@@ -269,5 +337,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     fontSize: 13,
     marginRight: 8,
+  },
+  messageBtn: {
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    alignSelf: "flex-end",
+  },
+  messageBtnText: {
+    color: "white",
+    fontWeight: "600",
   },
 });
