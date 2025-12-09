@@ -7,7 +7,7 @@
 #### Prerequisites
 | Tool | Version | Purpose |
 |------|----------|----------|
-| Node.js | ≥ 18.x | JavaScript runtime |
+| Node.js | ≥ 22.x | JavaScript runtime |
 | npm | ≥ 9.x | Package manager |
 | Expo CLI | 6.x | Run React Native apps |
 
